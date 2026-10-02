@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Library Loan API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky numbered contents rail on the left, one reading column on the right; stacks to one column on phones. */
+:root {
+  --bg: #F2F5F7;
+  --surface: #FFFFFF;
+  --ink: #15202A;
+  --muted: #586777;
+  --line: #D6DEE5;
+  --accent: #0A7593;
+  --accent-soft: #DDF0F6;
+  --code-bg: #EAEFF3;
+  --ok: #1B7447;      --ok-bg: #DDF3E7;
+  --c400: #855400;    --c400-bg: #FDF0D3;
+  --c404: #4F5396;    --c404-bg: #E9E9F9;
+  --c409: #9A3A10;    --c409-bg: #FCE7DC;
+  --c422: #A01C47;    --c422-bg: #FBE3EB;
+  --c500: #45515D;    --c500-bg: #E6EAEE;
+  --hex-core: #DDF0F6;
+  --hex-ring: #FFFFFF;
+
+  --f-display: "Bai Jamjuree", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E141A; --surface: #151D25; --ink: #E3E9EF; --muted: #93A1AF; --line: #28333E;
+    --accent: #52C3E4; --accent-soft: #12303B; --code-bg: #1A242D;
+    --ok: #5ED29B; --ok-bg: #16352A;
+    --c400: #F0C36A; --c400-bg: #372A0E;
+    --c404: #B4B7F0; --c404-bg: #25264A;
+    --c409: #F3A37F; --c409-bg: #3C2116;
+    --c422: #F09AB5; --c422-bg: #3E1A28;
+    --c500: #B4BFCA; --c500-bg: #25303A;
+    --hex-core: #12303B; --hex-ring: #151D25;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E141A; --surface: #151D25; --ink: #E3E9EF; --muted: #93A1AF; --line: #28333E;
+  --accent: #52C3E4; --accent-soft: #12303B; --code-bg: #1A242D;
+  --ok: #5ED29B; --ok-bg: #16352A;
+  --c400: #F0C36A; --c400-bg: #372A0E;
+  --c404: #B4B7F0; --c404-bg: #25264A;
+  --c409: #F3A37F; --c409-bg: #3C2116;
+  --c422: #F09AB5; --c422-bg: #3E1A28;
+  --c500: #B4BFCA; --c500-bg: #25303A;
+  --hex-core: #12303B; --hex-ring: #151D25;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15.5px; line-height: 1.7;
+  padding-inline: 16px; padding-block: 0 64px;
+}
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+
+/* ---------- header ---------- */
+header.top { grid-column: 1 / -1; padding-block: 48px 32px; border-bottom: 1px solid var(--line); display: grid; gap: 16px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.05; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.lede { margin: 0; max-width: 62ch; color: var(--muted); font-size: 17px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.meta span { font-size: 13px; padding: 3px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.meta span b { font-weight: 600; color: var(--accent); }
+.progress { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); max-width: 420px; }
+.progress .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.progress .bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.progress output { font-variant-numeric: tabular-nums; font-family: var(--f-mono); color: var(--ink); }
+
+/* ---------- toc ---------- */
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-block: 32px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: t; }
+nav.toc li { counter-increment: t; }
+nav.toc a { display: flex; gap: 10px; padding: 5px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 14px; }
+nav.toc a::before { content: counter(t, decimal-leading-zero); font-family: var(--f-mono); font-size: 11.5px; padding-top: 3px; color: var(--line); }
+nav.toc a:hover, nav.toc a.on { color: var(--ink); background: var(--surface); }
+nav.toc a.on::before { color: var(--accent); }
+@media (max-width: 900px) {
+  nav.toc { position: static; padding-block: 16px; border-bottom: 1px solid var(--line); }
+  nav.toc ol { display: flex; flex-wrap: wrap; gap: 4px; }
+  nav.toc a { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
+  nav.toc a::before { padding-top: 2px; }
+}
+
+/* ---------- content ---------- */
+main { min-width: 0; }
+section { padding-block: 40px 8px; scroll-margin-top: 12px; }
+section + section { border-top: 1px solid var(--line); }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; margin: 0 0 16px; display: flex; gap: 14px; align-items: baseline; text-wrap: balance; }
+h2 .n { font-family: var(--f-mono); font-size: 14px; color: var(--accent); font-weight: 600; }
+h3 { font-family: var(--f-display); font-weight: 600; font-size: 19px; margin: 32px 0 10px; text-wrap: balance; }
+p, li { max-width: 68ch; }
+p { margin: 0 0 12px; }
+ul, ol { padding-left: 22px; margin: 0 0 12px; }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--f-mono); font-size: .86em; }
+:not(pre) > code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+pre.code { background: var(--code-bg); border-radius: 8px; padding: 14px 18px; overflow-x: auto; font-family: var(--f-mono); font-size: 13px; line-height: 1.6; margin: 0 0 16px; }
+.goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+.goal { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 4px; align-content: start; }
+.goal b { font-family: var(--f-display); font-size: 16px; }
+.goal span { font-size: 14px; color: var(--muted); }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--code-bg); white-space: nowrap; }
+td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td.nowrap { white-space: nowrap; }
+
+/* status pills */
+.pill { display: inline-block; font-family: var(--f-mono); font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 5px; margin: 2px 2px 2px 0; white-space: nowrap; }
+.s400 { color: var(--c400); background: var(--c400-bg); }
+.s404 { color: var(--c404); background: var(--c404-bg); }
+.s409 { color: var(--c409); background: var(--c409-bg); }
+.s422 { color: var(--c422); background: var(--c422-bg); }
+.s500 { color: var(--c500); background: var(--c500-bg); }
+.s2xx { color: var(--ok); background: var(--ok-bg); }
+.m { font-family: var(--f-mono); font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; }
+.m.get { color: var(--ok); background: var(--ok-bg); }
+.m.post { color: var(--accent); background: var(--accent-soft); }
+.m.patch { color: var(--c400); background: var(--c400-bg); }
+
+/* callouts */
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 16px; font-size: 14.5px; }
+.note ul { margin: 0; }
+.rules { counter-reset: r; list-style: none; padding: 0; display: grid; gap: 8px; }
+.rules li { counter-increment: r; display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px; max-width: none; }
+.rules li::before { content: counter(r); font-family: var(--f-mono); font-weight: 600; font-size: 13px; color: var(--c422); background: var(--c422-bg); border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; }
+
+/* fine calculator */
+.calc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 14px; margin: 0 0 16px; }
+.calc .row { display: flex; flex-wrap: wrap; gap: 14px; }
+.calc label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+.calc input { font-family: var(--f-mono); font-size: 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); width: 100%; }
+.calc input:focus-visible, button:focus-visible, a:focus-visible, input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.result { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.result div { display: grid; }
+.result small { font-size: 12px; color: var(--muted); }
+.result strong { font-family: var(--f-mono); font-size: 18px; }
+.result .fine strong { font-size: 28px; color: var(--c422); }
+.result .fine.zero strong { color: var(--ok); }
+.calc .formula { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); }
+tr.pick { cursor: pointer; }
+tr.pick:hover td { background: var(--accent-soft); }
+
+/* diagrams */
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 0 0 16px; }
+.diagram pre.mermaid { margin: 0; background: transparent; }
+.diagram .cap { font-size: 13px; color: var(--muted); margin-top: 8px; }
+svg.hex { display: block; width: 100%; min-width: 620px; height: auto; font-family: var(--f-body); }
+svg.hex .ring { fill: var(--hex-ring); stroke: var(--accent); stroke-width: 2; }
+svg.hex .core { fill: var(--hex-core); stroke: var(--accent); stroke-width: 1.5; }
+svg.hex .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+svg.hex .box.dashed { stroke-dasharray: 5 4; }
+svg.hex .t { fill: var(--ink); font-size: 13px; }
+svg.hex .tb { fill: var(--ink); font-size: 15px; font-weight: 600; font-family: var(--f-display); }
+svg.hex .ts { fill: var(--muted); font-size: 11.5px; }
+svg.hex .tm { fill: var(--muted); font-size: 11px; font-family: var(--f-mono); }
+svg.hex .ta { fill: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+svg.hex .tw { fill: var(--c422); font-size: 11.5px; }
+svg.hex .ln { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+svg.hex .ln.d { stroke-dasharray: 4 4; }
+svg.hex .ah { fill: var(--muted); }
+
+/* diagram zoom */
+.diagram { position: relative; cursor: zoom-in; }
+.diagram, .diagram *, .zoom-stage, .zoom-stage * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.zoom-stage svg { pointer-events: none; }
+.zbtn { position: absolute; top: 10px; right: 10px; z-index: 2; font: 600 12.5px var(--f-body); color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.zbtn:hover { background: var(--accent-soft); }
+.zoom { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.zoom[hidden] { display: none; }
+.zoom-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.zoom-bar .ttl { font-family: var(--f-display); font-weight: 600; font-size: 16px; margin-right: auto; min-width: 0; }
+.zoom-bar button { font: 600 14px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; min-width: 36px; height: 34px; padding: 0 10px; cursor: pointer; }
+.zoom-bar button:hover { border-color: var(--accent); }
+.zoom-bar output { font-family: var(--f-mono); font-size: 13px; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.zoom-stage { position: relative; overflow: hidden; touch-action: none; cursor: grab; }
+.zoom-stage.drag { cursor: grabbing; }
+.zoom-stage .pan { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.zoom-stage svg { display: block; max-width: none !important; min-width: 0 !important; }
+.zoom-hint { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font-size: 12.5px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; pointer-events: none; }
+
+/* ER legend */
+.legend-key { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 12px; font-size: 14.5px; }
+.legend-key .k { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 4px; font-family: var(--f-mono); color: var(--accent); background: var(--accent-soft); border-radius: 5px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 0 0 8px; }
+.sym { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.sym svg { width: 100%; max-width: 180px; height: auto; display: block; }
+.sym .l { stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+.sym .c { fill: var(--surface); stroke: var(--ink); stroke-width: 1.8; }
+.sym .b { fill: var(--code-bg); stroke: var(--muted); stroke-width: 1.2; }
+.sym figcaption { display: grid; gap: 2px; }
+.sym figcaption b { font-family: var(--f-display); font-size: 15.5px; }
+.sym figcaption span { font-size: 13px; color: var(--muted); }
+.sym figcaption em { font-style: normal; }
+
+/* checklist */
+td.chk { width: 44px; text-align: center; }
+input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--ok); cursor: pointer; }
+tr.done td:not(.chk) { color: var(--muted); }
+tr.done td.num { text-decoration: line-through; }
+.bonus { list-style: none; padding: 0; display: grid; gap: 6px; }
+.bonus label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.bonus input { margin-top: 5px; flex: none; }
+.bonus label:has(input:checked) span { color: var(--muted); text-decoration: line-through; }
+
+/* score bars */
+.score { display: grid; gap: 10px; margin: 0 0 16px; }
+.score .r { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 4px 12px; align-items: center; }
+.score .lbl { font-size: 14.5px; }
+.score .pts { font-family: var(--f-mono); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; grid-row: span 2; }
+.score .track { height: 8px; background: var(--code-bg); border-radius: 4px; overflow: hidden; }
+.score .track i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+
+/* steps */
+.steps { list-style: none; padding: 0; counter-reset: s; display: grid; gap: 0; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 40px minmax(0,1fr); gap: 12px; padding-block: 10px; border-bottom: 1px dashed var(--line); max-width: none; }
+.steps li:last-child { border-bottom: 0; }
+.steps li::before { content: counter(s); font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--accent); line-height: 1.3; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Go exercise · hexagonal architecture</div>
+    <h1>Library Loan API</h1>
+    <p class="lede">สร้าง REST API ระบบยืม-คืนหนังสือห้องสมุด แยก business logic ออกจาก HTTP และ database แบบ Ports &amp; Adapters และเขียนเทสต์ให้ครอบคลุมทุกกฎ</p>
+    <div class="meta">
+      <span>ระดับ <b>กลาง</b></span>
+      <span>ภาษา <b>Go</b></span>
+      <span>สถาปัตยกรรม <b>Hexagonal</b></span>
+      <span>เทสต์ <b>บังคับ</b></span>
+      <span>เวลาที่แนะนำ <b>2–4 วัน</b></span>
+    </div>
+    <div class="progress" title="เก็บสถานะไว้ในเบราว์เซอร์นี้">
+      <span>Acceptance tests ที่ผ่าน</span>
+      <div class="bar"><i id="pbar"></i></div>
+      <output id="pcount">0/19</output>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="สารบัญ">
+    <ol>
+      <li><a href="#overview">ภาพรวม</a></li>
+      <li><a href="#er">ER Diagram</a></li>
+      <li><a href="#rules">กฎทางธุรกิจ</a></li>
+      <li><a href="#api">API Endpoints</a></li>
+      <li><a href="#workflow">Workflow</a></li>
+      <li><a href="#arch">ข้อกำหนดสถาปัตยกรรม</a></li>
+      <li><a href="#tests">ข้อกำหนดเทสต์</a></li>
+      <li><a href="#bonus">Bonus</a></li>
+      <li><a href="#score">เกณฑ์ให้คะแนน</a></li>
+      <li><a href="#steps">ลำดับการทำ</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="overview">
+      <h2><span class="n">01</span>ภาพรวม</h2>
+      <p>ให้สร้าง REST API สำหรับห้องสมุดเล็ก ๆ ที่ทำสิ่งเหล่านี้ได้</p>
+      <ul>
+        <li>จัดการ<b>สมาชิก</b> ได้แก่ สมัคร ดูข้อมูล และระงับ/เปิดใช้งาน</li>
+        <li>จัดการ<b>หนังสือ</b> และ<b>เล่มจริง (copy)</b> โดยหนังสือ 1 เรื่องมีได้หลายเล่ม</li>
+        <li><b>ยืม ต่ออายุ และคืน</b>หนังสือตามกฎทางธุรกิจ</li>
+        <li>คำนวณ<b>ค่าปรับ</b>เมื่อคืนช้า และให้<b>ชำระค่าปรับ</b>ได้</li>
+      </ul>
+      <p>โจทย์นี้ไม่ได้วัดที่ CRUD แต่วัดสามเรื่องนี้</p>
+      <div class="goals">
+        <div class="goal"><b>แยก layer ให้ขาด</b><span>core ไม่รู้จัก HTTP และ database เลย</span></div>
+        <div class="goal"><b>เวลาต้องเทสต์ได้</b><span>ห้ามเรียก <code>time.Now()</code> ใน core ให้ inject <code>Clock</code> เข้ามาแทน</span></div>
+        <div class="goal"><b>กันการยืมซ้อน</b><span>ใช้ transaction ให้เล่มเดียวกันถูกยืมพร้อมกันสองคนไม่ได้</span></div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="er">
+      <h2><span class="n">02</span>ER Diagram</h2>
+      <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    MEMBERS ||--o{ LOANS : "ยืม"
+    MEMBERS ||--o{ FINES : "ต้องจ่าย"
+    BOOKS ||--o{ BOOK_COPIES : "มีเล่มจริง"
+    BOOK_COPIES ||--o{ LOANS : "ถูกยืมใน"
+    LOANS ||--o| FINES : "เกิดค่าปรับ"
+
+    MEMBERS {
+        uuid id PK
+        string name
+        string email UK
+        string status "ACTIVE | SUSPENDED"
+        timestamp created_at
+    }
+    BOOKS {
+        uuid id PK
+        string isbn UK "13 หลัก"
+        string title
+        string author
+        timestamp created_at
+    }
+    BOOK_COPIES {
+        uuid id PK
+        uuid book_id FK
+        string barcode UK
+        string status "AVAILABLE | BORROWED | LOST"
+        timestamp created_at
+    }
+    LOANS {
+        uuid id PK
+        uuid member_id FK
+        uuid copy_id FK
+        timestamp borrowed_at
+        timestamp due_at
+        timestamp returned_at "nullable"
+        int renew_count "0 หรือ 1"
+    }
+    FINES {
+        uuid id PK
+        uuid loan_id FK,UK "1 loan มีได้ไม่เกิน 1 fine"
+        uuid member_id FK
+        bigint amount "บาท (integer)"
+        timestamp created_at
+        timestamp paid_at "nullable"
+    }
+</pre>
+      </div>
+
+      <h3>วิธีอ่านสัญลักษณ์ (Crow's Foot)</h3>
+      <p>สัญลักษณ์ที่ปลายเส้นบอกว่า <b>ตารางฝั่งตรงข้ามหนึ่งแถว เชื่อมกับตารางฝั่งนี้ได้กี่แถว</b> แต่ละปลายมีสองส่วน ส่วนที่<b>ชิดกล่อง</b>บอกจำนวน<b>สูงสุด</b> ส่วนที่<b>ถัดออกมา</b>บอกจำนวน<b>ต่ำสุด</b></p>
+      <div class="legend-key">
+        <span><b class="k">|</b> ขีด = 1</span>
+        <span><b class="k">○</b> วงกลม = 0 (ไม่มีก็ได้)</span>
+        <span><b class="k">&lt;</b> สามแฉก (ตีนกา) = หลายแถว</span>
+      </div>
+      <div class="legend">
+        <figure class="sym">
+          <svg viewBox="0 0 130 40" aria-hidden="true"><line class="l" x1="0" y1="20" x2="112" y2="20"/><line class="l" x1="92" y1="9" x2="92" y2="31"/><line class="l" x1="100" y1="9" x2="100" y2="31"/><rect class="b" x="112" y="2" width="18" height="36"/></svg>
+          <figcaption><b>ต้องมี 1 และมีได้แค่ 1</b><span>exactly one · Mermaid <code>||</code></span></figcaption>
+        </figure>
+        <figure class="sym">
+          <svg viewBox="0 0 130 40" aria-hidden="true"><line class="l" x1="0" y1="20" x2="112" y2="20"/><line class="l" x1="100" y1="9" x2="100" y2="31"/><circle class="c" cx="84" cy="20" r="6"/><rect class="b" x="112" y="2" width="18" height="36"/></svg>
+          <figcaption><b>มี 0 หรือ 1</b><span>zero or one · Mermaid <code>o|</code> / <code>|o</code></span></figcaption>
+        </figure>
+        <figure class="sym">
+          <svg viewBox="0 0 130 40" aria-hidden="true"><line class="l" x1="0" y1="20" x2="94" y2="20"/><line class="l" x1="94" y1="20" x2="112" y2="6"/><line class="l" x1="94" y1="20" x2="112" y2="20"/><line class="l" x1="94" y1="20" x2="112" y2="34"/><circle class="c" cx="80" cy="20" r="6"/><rect class="b" x="112" y="2" width="18" height="36"/></svg>
+          <figcaption><b>มี 0 ถึงหลายแถว</b><span>zero or many · Mermaid <code>o{</code> / <code>}o</code></span></figcaption>
+        </figure>
+        <figure class="sym">
+          <svg viewBox="0 0 130 40" aria-hidden="true"><line class="l" x1="0" y1="20" x2="94" y2="20"/><line class="l" x1="94" y1="20" x2="112" y2="6"/><line class="l" x1="94" y1="20" x2="112" y2="20"/><line class="l" x1="94" y1="20" x2="112" y2="34"/><line class="l" x1="84" y1="9" x2="84" y2="31"/><rect class="b" x="112" y="2" width="18" height="36"/></svg>
+          <figcaption><b>มี 1 ถึงหลายแถว</b><span>one or many · Mermaid <code>|{</code> / <code>}|</code> <em class="muted">(ไม่ได้ใช้ในโจทย์นี้)</em></span></figcaption>
+        </figure>
+      </div>
+      <p class="muted" style="font-size:14px">กล่องสีเทาในรูปคือตาราง ตามมาตรฐานวงกลมควรเป็นวงกลวง ถ้าเห็นเป็นวงทึบในธีมมืดความหมายก็เหมือนเดิม</p>
+
+      <h3>ความสัมพันธ์ในโจทย์นี้</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>ความสัมพันธ์</th><th>อ่านว่า</th></tr></thead>
+        <tbody>
+          <tr><td class="mono nowrap">MEMBERS ||--o{ LOANS</td><td>สมาชิก 1 คนมี loan ได้ตั้งแต่ 0 ถึงหลายรายการ ส่วน loan 1 รายการต้องเป็นของสมาชิก 1 คนพอดี</td></tr>
+          <tr><td class="mono nowrap">MEMBERS ||--o{ FINES</td><td>สมาชิก 1 คนมีค่าปรับได้ตั้งแต่ 0 ถึงหลายรายการ ส่วนค่าปรับ 1 รายการเป็นของสมาชิก 1 คนพอดี</td></tr>
+          <tr><td class="mono nowrap">BOOKS ||--o{ BOOK_COPIES</td><td>หนังสือ 1 เรื่องมีเล่มจริงได้ตั้งแต่ 0 เล่มขึ้นไป ส่วนเล่มจริง 1 เล่มเป็นของหนังสือ 1 เรื่องพอดี</td></tr>
+          <tr><td class="mono nowrap">BOOK_COPIES ||--o{ LOANS</td><td>เล่มจริง 1 เล่มถูกยืมได้หลายครั้งในต่างช่วงเวลา แต่ในช่วงเวลาหนึ่งต้องมี loan ที่ยังไม่คืนได้แค่ 1 รายการ</td></tr>
+          <tr><td class="mono nowrap">LOANS ||--o| FINES</td><td>loan 1 รายการมีค่าปรับ<b>ได้ไม่เกิน 1</b> รายการ ถ้าคืนตรงเวลาจะไม่มีค่าปรับ</td></tr>
+        </tbody>
+      </table></div>
+      <p>ตัวย่อในกล่องตาราง: <code>PK</code> คือ primary key, <code>FK</code> คือ foreign key ที่ชี้ไปตารางอื่น และ <code>UK</code> คือ unique key ที่ห้ามมีค่าซ้ำ</p>
+
+      <div class="note">
+        <ul>
+          <li>เงินเก็บเป็น integer (<code>int64</code>) ห้ามใช้ float</li>
+          <li>สถานะของ loan (<code>ACTIVE</code> / <code>OVERDUE</code> / <code>RETURNED</code>) <b>ไม่ต้องเก็บใน DB</b> ให้คำนวณจาก <code>returned_at</code>, <code>due_at</code> และเวลาปัจจุบัน</li>
+          <li>ถ้าใช้ Postgres ควรมี <code>UNIQUE (copy_id) WHERE returned_at IS NULL</code> เป็นด่านสุดท้ายกันการยืมซ้อน</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section id="rules">
+      <h2><span class="n">03</span>กฎทางธุรกิจ</h2>
+
+      <h3>3.1 การยืม (Borrow)</h3>
+      <p>ให้ตรวจตาม<b>ลำดับในตาราง</b> และคืน error ของข้อแรกที่ไม่ผ่าน ลำดับต้องแน่นอนเพื่อให้เทสต์ได้</p>
+      <div class="tbl"><table>
+        <thead><tr><th class="num">#</th><th>เงื่อนไข</th><th>Error ถ้าไม่ผ่าน</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>มีสมาชิกคนนี้อยู่</td><td><span class="pill s404">MEMBER_NOT_FOUND</span></td></tr>
+          <tr><td class="num">2</td><td>สมาชิกมีสถานะ <code>ACTIVE</code></td><td><span class="pill s422">MEMBER_SUSPENDED</span></td></tr>
+          <tr><td class="num">3</td><td>สมาชิกไม่มีค่าปรับค้างชำระ</td><td><span class="pill s422">HAS_UNPAID_FINES</span></td></tr>
+          <tr><td class="num">4</td><td>สมาชิกไม่มี loan ที่เกินกำหนดแล้วยังไม่คืน</td><td><span class="pill s422">HAS_OVERDUE_LOANS</span></td></tr>
+          <tr><td class="num">5</td><td>สมาชิกยืมค้างอยู่<b>น้อยกว่า 3 เล่ม</b></td><td><span class="pill s422">LOAN_LIMIT_REACHED</span></td></tr>
+          <tr><td class="num">6</td><td>มีเล่มตาม barcode ที่ส่งมา</td><td><span class="pill s404">COPY_NOT_FOUND</span></td></tr>
+          <tr><td class="num">7</td><td>เล่มนั้นมีสถานะ <code>AVAILABLE</code></td><td><span class="pill s409">COPY_NOT_AVAILABLE</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>ถ้าผ่านครบทุกข้อ ให้สร้าง loan โดย <code>borrowed_at = now</code> และ <code>due_at = now + 14 วัน</code> แล้วเปลี่ยน copy เป็น <code>BORROWED</code> ทั้งสองขั้นตอนต้องอยู่ใน<b>transaction เดียวกัน</b></p>
+
+      <h3>3.2 การต่ออายุ (Renew)</h3>
+      <div class="tbl"><table>
+        <thead><tr><th class="num">#</th><th>เงื่อนไข</th><th>Error</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>มี loan นี้อยู่</td><td><span class="pill s404">LOAN_NOT_FOUND</span></td></tr>
+          <tr><td class="num">2</td><td>ยังไม่ได้คืน</td><td><span class="pill s409">LOAN_ALREADY_RETURNED</span></td></tr>
+          <tr><td class="num">3</td><td>ยังไม่เกินกำหนด (<code>now &lt;= due_at</code>)</td><td><span class="pill s422">LOAN_OVERDUE</span></td></tr>
+          <tr><td class="num">4</td><td>ยังไม่เคยต่ออายุ (<code>renew_count == 0</code>)</td><td><span class="pill s422">RENEW_LIMIT_REACHED</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>ถ้าผ่าน ให้ตั้ง <code>due_at = due_at + 7 วัน</code> (นับต่อจาก due เดิม ไม่ใช่จาก now) และ <code>renew_count = 1</code></p>
+
+      <h3>3.3 การคืน (Return)</h3>
+      <div class="tbl"><table>
+        <thead><tr><th class="num">#</th><th>เงื่อนไข</th><th>Error</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>มี loan นี้อยู่</td><td><span class="pill s404">LOAN_NOT_FOUND</span></td></tr>
+          <tr><td class="num">2</td><td>ยังไม่ได้คืน</td><td><span class="pill s409">LOAN_ALREADY_RETURNED</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>ถ้าผ่าน ให้ตั้ง <code>returned_at = now</code> เปลี่ยน copy กลับเป็น <code>AVAILABLE</code> แล้วคำนวณค่าปรับ ถ้าค่าปรับมากกว่า 0 ให้สร้าง record ใน <code>FINES</code> ทุกขั้นตอนอยู่ใน transaction เดียวกัน</p>
+
+      <h3>3.4 สูตรค่าปรับ</h3>
+<pre class="code">lateDuration = returned_at - due_at
+ถ้า lateDuration &lt;= 0          → ค่าปรับ 0
+lateDays     = ceil(lateDuration / 24h)   // เศษของวันนับเป็น 1 วัน
+fine         = min(lateDays × 10, 500)    // วันละ 10 บาท สูงสุด 500 บาท</pre>
+
+      <div class="calc" aria-label="ลองคำนวณค่าปรับ">
+        <div class="row">
+          <label for="due">due_at<input type="datetime-local" id="due" value="2026-10-14T10:00"></label>
+          <label for="ret">returned_at<input type="datetime-local" id="ret" value="2026-10-16T09:00"></label>
+        </div>
+        <div class="result" aria-live="polite">
+          <div><small>คืนช้า</small><strong id="rLate">—</strong></div>
+          <div><small>lateDays</small><strong id="rDays">—</strong></div>
+          <div class="fine" id="rFineBox"><small>ค่าปรับ</small><strong id="rFine">—</strong></div>
+        </div>
+        <div class="formula" id="rFormula"></div>
+      </div>
+
+      <p class="muted" style="font-size:14px">กดแถวในตารางเพื่อโหลดตัวอย่างนั้นเข้าเครื่องคำนวณ ทุกแถวต้องอยู่ใน table-driven test ของคุณด้วย</p>
+      <div class="tbl"><table id="fineTable">
+        <thead><tr><th>due_at</th><th>returned_at</th><th class="num">ค่าปรับ (บาท)</th></tr></thead>
+        <tbody>
+          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-14T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-14 10:00</td><td class="num">0</td></tr>
+          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-14T10:01"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-14 10:01</td><td class="num">10</td></tr>
+          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-15T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-15 10:00</td><td class="num">10</td></tr>
+          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-16T09:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-16 09:00</td><td class="num">20</td></tr>
+          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-12-13T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-12-13 10:00</td><td class="num">500 <span class="muted">(60 วัน, ติด cap)</span></td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>3.5 การชำระค่าปรับ</h3>
+      <p>จ่ายได้เต็มจำนวนเท่านั้น จึงไม่ต้องรับ amount เมื่อจ่ายให้ตั้ง <code>paid_at = now</code> ถ้าจ่ายไปแล้วจะได้ <span class="pill s409">FINE_ALREADY_PAID</span></p>
+    </section>
+
+    <!-- 4 -->
+    <section id="api">
+      <h2><span class="n">04</span>API Endpoints</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Method</th><th>Path</th><th>คำอธิบาย</th></tr></thead>
+        <tbody>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/members</td><td>สมัครสมาชิก <code>{name, email}</code></td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono nowrap">/members/{id}</td><td>ดูข้อมูลสมาชิก</td></tr>
+          <tr><td><span class="m patch">PATCH</span></td><td class="mono nowrap">/members/{id}/status</td><td>เปลี่ยนสถานะ <code>{status}</code> เป็น ACTIVE หรือ SUSPENDED</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/books</td><td>เพิ่มหนังสือ <code>{isbn, title, author}</code></td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/books/{id}/copies</td><td>เพิ่มเล่มจริง <code>{barcode}</code></td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono nowrap">/books?q=&amp;page=1&amp;limit=20</td><td>ค้นหาจาก title/author พร้อม <code>available_copies</code></td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/loans</td><td>ยืม <code>{member_id, barcode}</code></td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/loans/{id}/renew</td><td>ต่ออายุ</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/loans/{id}/return</td><td>คืน (response แนบ fine มาด้วยถ้ามี)</td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono nowrap">/members/{id}/loans?status=</td><td>ประวัติการยืม กรองด้วย <code>active</code> | <code>overdue</code> | <code>returned</code></td></tr>
+          <tr><td><span class="m get">GET</span></td><td class="mono nowrap">/members/{id}/fines?unpaid=true</td><td>รายการค่าปรับ</td></tr>
+          <tr><td><span class="m post">POST</span></td><td class="mono nowrap">/fines/{id}/pay</td><td>ชำระค่าปรับ</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Validation</h3>
+      <ul>
+        <li><code>name</code> ต้องไม่ว่าง และยาวไม่เกิน 100 ตัวอักษร</li>
+        <li><code>email</code> ต้องเป็นรูปแบบ email ที่ถูกต้อง และต้องไม่ซ้ำ</li>
+        <li><code>isbn</code> ต้องเป็นตัวเลข 13 หลัก และต้องไม่ซ้ำ</li>
+        <li><code>barcode</code> ต้องไม่ว่าง และต้องไม่ซ้ำ</li>
+        <li><code>page &gt;= 1</code> และ <code>1 &lt;= limit &lt;= 100</code> โดยค่า default คือ 1 และ 20</li>
+      </ul>
+
+      <h3>ตัวอย่าง: ยืมหนังสือ</h3>
+<pre class="code">POST /loans
+Content-Type: application/json
+
+{ "member_id": "7b1c…", "barcode": "LIB-0001" }
+
+→ 201 Created
+{
+  "id": "a93f…",
+  "member_id": "7b1c…",
+  "copy_id": "c02d…",
+  "borrowed_at": "2026-10-01T10:00:00Z",
+  "due_at": "2026-10-15T10:00:00Z",
+  "returned_at": null,
+  "renew_count": 0,
+  "status": "ACTIVE"
+}</pre>
+
+      <h3>ตัวอย่าง: คืนช้า 2 วัน 2 ชั่วโมง</h3>
+<pre class="code">POST /loans/a93f…/return
+
+→ 200 OK
+{
+  "loan": { …, "status": "RETURNED", "returned_at": "2026-10-17T12:00:00Z" },
+  "fine": { "id": "f11e…", "amount": 30, "paid_at": null }
+}</pre>
+
+      <h3>รูปแบบ Error</h3>
+      <p>ทุก endpoint ต้องใช้รูปแบบเดียวกัน</p>
+<pre class="code">{ "error": { "code": "LOAN_LIMIT_REACHED", "message": "member already has 3 active loans" } }</pre>
+      <div class="tbl"><table>
+        <thead><tr><th>HTTP</th><th>Error codes</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill s400">400</span></td><td><span class="pill s400">VALIDATION_ERROR</span></td></tr>
+          <tr><td><span class="pill s404">404</span></td><td><span class="pill s404">MEMBER_NOT_FOUND</span><span class="pill s404">BOOK_NOT_FOUND</span><span class="pill s404">COPY_NOT_FOUND</span><span class="pill s404">LOAN_NOT_FOUND</span><span class="pill s404">FINE_NOT_FOUND</span></td></tr>
+          <tr><td><span class="pill s409">409</span></td><td><span class="pill s409">EMAIL_ALREADY_EXISTS</span><span class="pill s409">ISBN_ALREADY_EXISTS</span><span class="pill s409">BARCODE_ALREADY_EXISTS</span><span class="pill s409">COPY_NOT_AVAILABLE</span><span class="pill s409">LOAN_ALREADY_RETURNED</span><span class="pill s409">FINE_ALREADY_PAID</span></td></tr>
+          <tr><td><span class="pill s422">422</span></td><td><span class="pill s422">MEMBER_SUSPENDED</span><span class="pill s422">HAS_UNPAID_FINES</span><span class="pill s422">HAS_OVERDUE_LOANS</span><span class="pill s422">LOAN_LIMIT_REACHED</span><span class="pill s422">LOAN_OVERDUE</span><span class="pill s422">RENEW_LIMIT_REACHED</span></td></tr>
+          <tr><td><span class="pill s500">500</span></td><td><span class="pill s500">INTERNAL_ERROR</span> <span class="muted" style="font-size:13.5px">ห้ามส่งรายละเอียด error ภายในออกไปให้ client</span></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 5 -->
+    <section id="workflow">
+      <h2><span class="n">05</span>Workflow</h2>
+
+      <h3>5.1 สถาปัตยกรรม Hexagonal</h3>
+      <div class="diagram">
+        <svg class="hex" viewBox="0 0 760 420" role="img" aria-label="แผนภาพ hexagonal: HTTP handler เรียก inbound port เข้า core, core เรียก outbound port ที่ adapter ต่าง ๆ implement">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <!-- driving side -->
+          <text class="ta" x="76" y="84" text-anchor="middle">DRIVING</text>
+          <rect class="box" x="16" y="98" width="120" height="44" rx="8"/>
+          <text class="t" x="76" y="125" text-anchor="middle">HTTP Client</text>
+          <rect class="box" x="16" y="184" width="120" height="52" rx="8"/>
+          <text class="t" x="76" y="206" text-anchor="middle">HTTP Handler</text>
+          <text class="tm" x="76" y="224" text-anchor="middle">adapter/http</text>
+          <path class="ln" d="M76,142 L76,182" marker-end="url(#arr)"/>
+          <path class="ln" d="M136,210 L186,210" marker-end="url(#arr)"/>
+
+          <!-- hexagons -->
+          <polygon class="ring" points="570,210 475,45.5 285,45.5 190,210 285,374.5 475,374.5"/>
+          <polygon class="core" points="475,210 427.5,127.7 332.5,127.7 285,210 332.5,292.3 427.5,292.3"/>
+          <text class="tb" x="380" y="84" text-anchor="middle">Services</text>
+          <text class="ts" x="380" y="102" text-anchor="middle">use cases · core/service</text>
+          <text class="tb" x="380" y="200" text-anchor="middle">Domain</text>
+          <text class="ts" x="380" y="219" text-anchor="middle">Member · Copy · Loan · Fine</text>
+          <text class="tm" x="380" y="236" text-anchor="middle">CalculateFine()</text>
+          <text class="ts" x="237" y="204" text-anchor="middle">Inbound</text>
+          <text class="ts" x="237" y="220" text-anchor="middle">ports</text>
+          <text class="ts" x="523" y="204" text-anchor="middle">Outbound</text>
+          <text class="ts" x="523" y="220" text-anchor="middle">ports</text>
+          <text class="tw" x="380" y="326" text-anchor="middle">ห้าม import net/http, database/sql</text>
+          <text class="tw" x="380" y="343" text-anchor="middle">ห้ามเรียก time.Now()</text>
+
+          <!-- driven side -->
+          <text class="ta" x="677" y="46" text-anchor="middle">DRIVEN</text>
+          <rect class="box" x="610" y="60" width="134" height="40" rx="8"/>
+          <text class="t" x="677" y="85" text-anchor="middle">In-memory Repo</text>
+          <rect class="box dashed" x="610" y="120" width="134" height="40" rx="8"/>
+          <text class="t" x="677" y="145" text-anchor="middle">Postgres Repo</text>
+          <rect class="box" x="610" y="180" width="134" height="40" rx="8"/>
+          <text class="t" x="677" y="205" text-anchor="middle">SystemClock</text>
+          <rect class="box" x="610" y="240" width="134" height="40" rx="8"/>
+          <text class="t" x="677" y="265" text-anchor="middle">UUID Generator</text>
+          <rect class="box" x="610" y="300" width="134" height="40" rx="8"/>
+          <text class="t" x="677" y="325" text-anchor="middle">TxManager</text>
+          <path class="ln d" d="M570,210 C590,210 590,80 608,80"/>
+          <path class="ln d" d="M570,210 C590,210 590,140 608,140"/>
+          <path class="ln d" d="M570,210 L608,200"/>
+          <path class="ln d" d="M570,210 C590,210 590,260 608,260"/>
+          <path class="ln d" d="M570,210 C590,210 590,320 608,320"/>
+          <text class="ts" x="677" y="370" text-anchor="middle">กรอบประ = bonus</text>
+          <text class="ts" x="677" y="386" text-anchor="middle">เส้นประ = implements</text>
+        </svg>
+      </div>
+
+      <h3>5.2 Flow การยืม</h3>
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    A([POST /loans]) --> B{Validate body}
+    B -- ไม่ผ่าน --> E400[400 VALIDATION_ERROR]
+    B -- ผ่าน --> TX(เริ่ม Transaction)
+    TX --> C1{Member มีอยู่?}
+    C1 -- ไม่ --> E1[404 MEMBER_NOT_FOUND]
+    C1 -- ใช่ --> C2{ACTIVE?}
+    C2 -- ไม่ --> E2[422 MEMBER_SUSPENDED]
+    C2 -- ใช่ --> C3{มีค่าปรับค้าง?}
+    C3 -- ใช่ --> E3[422 HAS_UNPAID_FINES]
+    C3 -- ไม่ --> C4{มี loan เกินกำหนด?}
+    C4 -- ใช่ --> E4[422 HAS_OVERDUE_LOANS]
+    C4 -- ไม่ --> C5{ยืมค้าง &lt; 3?}
+    C5 -- ไม่ --> E5[422 LOAN_LIMIT_REACHED]
+    C5 -- ใช่ --> C6{Copy มีอยู่?}
+    C6 -- ไม่ --> E6[404 COPY_NOT_FOUND]
+    C6 -- ใช่ --> C7{AVAILABLE?}
+    C7 -- ไม่ --> E7[409 COPY_NOT_AVAILABLE]
+    C7 -- ใช่ --> W[สร้าง Loan due = now+14d&lt;br/&gt;Copy → BORROWED]
+    W --> CM(Commit)
+    CM --> OK([201 Created])
+</pre>
+      </div>
+
+      <h3>5.3 Sequence การคืน (ไล่ผ่านทุก layer)</h3>
+      <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client
+    participant H as HTTP Handler
+    participant S as LoanService
+    participant TX as TxManager
+    participant LR as LoanRepo
+    participant CR as CopyRepo
+    participant FR as FineRepo
+    participant CL as Clock
+
+    Client->>H: POST /loans/{id}/return
+    H->>S: Return(ctx, loanID)
+    S->>TX: WithinTx(ctx, fn)
+    activate TX
+    TX->>LR: FindByID(loanID)
+    LR-->>TX: loan
+    alt ไม่พบ หรือคืนแล้ว
+        TX-->>S: ErrLoanNotFound / ErrLoanAlreadyReturned
+        S-->>H: domain error
+        H-->>Client: 404 / 409
+    else ปกติ
+        TX->>CL: Now()
+        CL-->>TX: now
+        Note over TX: loan.Return(now)&lt;br/&gt;fine = CalculateFine(due, now)
+        TX->>LR: Update(loan)
+        TX->>CR: UpdateStatus(copyID, AVAILABLE)
+        opt fine > 0
+            TX->>FR: Create(fine)
+        end
+        TX-->>S: loan, fine
+        S-->>H: loan, fine
+        H-->>Client: 200 OK
+    end
+    deactivate TX
+</pre>
+      </div>
+
+      <h3>5.4 State ของ Copy และ Loan</h3>
+      <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> AVAILABLE
+    AVAILABLE --> BORROWED: borrow
+    BORROWED --> AVAILABLE: return
+    AVAILABLE --> LOST: mark lost (bonus)
+    BORROWED --> LOST: mark lost (bonus)
+</pre>
+        <div class="cap">Copy: เก็บสถานะใน DB</div>
+      </div>
+      <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> ACTIVE: borrow
+    ACTIVE --> ACTIVE: renew (ครั้งเดียว)
+    ACTIVE --> OVERDUE: now > due_at
+    ACTIVE --> RETURNED: return (ไม่มีค่าปรับ)
+    OVERDUE --> RETURNED: return (มีค่าปรับ)
+    RETURNED --> [*]
+</pre>
+        <div class="cap">Loan: สถานะคำนวณจากเวลา ไม่ได้เก็บใน DB</div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="arch">
+      <h2><span class="n">06</span>ข้อกำหนดสถาปัตยกรรม</h2>
+      <p>โครงสร้างด้านล่างเป็นแค่คำแนะนำ ปรับได้ แต่ต้องแยก layer ให้ชัด</p>
+<pre class="code">.
+├── cmd/api/main.go                 # wiring: สร้าง adapter แล้ว inject เข้า service
+├── internal/
+│   ├── core/
+│   │   ├── domain/                 # entity, value object, domain error, CalculateFine
+│   │   ├── port/                   # interface ขาเข้า (services) และขาออก (repos, clock, tx)
+│   │   └── service/                # implement use case
+│   └── adapter/
+│       ├── http/                   # handler, DTO, map error → HTTP status
+│       ├── repository/memory/      # in-memory implementation (บังคับ)
+│       ├── repository/postgres/    # (bonus)
+│       └── clock/                  # SystemClock
+└── migrations/                     # (bonus)</pre>
+
+      <h3>กฎที่ห้ามละเมิด</h3>
+      <ol class="rules">
+        <li><span>package ใน <code>internal/core/...</code> <b>ห้าม import</b> <code>net/http</code>, <code>database/sql</code>, driver ของ DB หรือ package ใน <code>internal/adapter/...</code></span></li>
+        <li><span>ห้ามเรียก <code>time.Now()</code> ใน core ให้ใช้ <code>port.Clock</code> แทน</span></li>
+        <li><span>ห้ามสร้าง UUID ตรง ๆ ใน core ให้ใช้ <code>port.IDGenerator</code> แทน</span></li>
+        <li><span>Service ต้องรับ dependency ผ่าน constructor ในรูป interface เช่น <code>NewLoanService(repo port.LoanRepository, …)</code></span></li>
+        <li><span>Handler ห้ามมี business logic ทำได้แค่ parse, validate รูปแบบ, เรียก service และ map ผลลัพธ์</span></li>
+        <li><span>Domain error ต้องเช็คด้วย <code>errors.Is</code> ได้ และ handler แปลงเป็น HTTP status ในที่เดียว</span></li>
+        <li><span>การยืมและการคืนต้องทำผ่าน <code>TxManager.WithinTx(ctx, fn)</code> โดยตัว in-memory จะ implement ด้วย mutex ก็ได้</span></li>
+      </ol>
+
+      <h3>ตัวอย่าง outbound port</h3>
+<pre class="code">type Clock interface { Now() time.Time }
+
+type IDGenerator interface { NewID() string }
+
+type TxManager interface {
+    WithinTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type LoanRepository interface {
+    Create(ctx context.Context, l *domain.Loan) error
+    FindByID(ctx context.Context, id string) (*domain.Loan, error)
+    Update(ctx context.Context, l *domain.Loan) error
+    ListActiveByMember(ctx context.Context, memberID string) ([]domain.Loan, error)
+    // ...
+}</pre>
+    </section>
+
+    <!-- 7 -->
+    <section id="tests">
+      <h2><span class="n">07</span>ข้อกำหนดเทสต์</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>ชั้น</th><th>ต้องมี</th><th>เครื่องมือ</th></tr></thead>
+        <tbody>
+          <tr><td class="nowrap"><b>Domain</b></td><td>table-driven test ของ <code>CalculateFine</code> ครบทุกแถวในข้อ 3.4 และ edge case อื่น ๆ</td><td class="mono">testing</td></tr>
+          <tr><td class="nowrap"><b>Service</b></td><td>เทสต์ทุก error path ของ Borrow, Renew, Return และ Pay โดยใช้ fake/mock ของ port และ <code>FakeClock</code> ที่กำหนดเวลาเองได้</td><td class="mono">fake เขียนเอง, gomock, mockery</td></tr>
+          <tr><td class="nowrap"><b>HTTP</b></td><td>แต่ละ domain error ต้อง map เป็น status และ code ที่ถูกต้อง และ validation ต้องทำงาน</td><td class="mono">net/http/httptest</td></tr>
+          <tr><td class="nowrap"><b>Repository</b></td><td>เทสต์ in-memory repo และ postgres repo ถ้าทำ bonus</td><td class="mono">testing, testcontainers</td></tr>
+          <tr><td class="nowrap"><b>Concurrency</b></td><td>ยิง Borrow copy เดียวกันพร้อมกัน 20 goroutine ต้อง<b>สำเร็จแค่ 1 ครั้ง</b></td><td class="mono">go test -race</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="note">
+        <b>เกณฑ์ผ่าน</b>
+        <ul>
+          <li><code>go test ./... -race</code> ต้องผ่านทั้งหมด</li>
+          <li>coverage ของ <code>internal/core/...</code> ไม่ต่ำกว่า <b>80%</b></li>
+          <li><code>go vet ./...</code> ต้องไม่มี warning</li>
+        </ul>
+      </div>
+
+      <h3>Acceptance test cases ขั้นต่ำ</h3>
+      <p class="muted" style="font-size:14px"><code>T0</code> คือเวลาที่ยืม และทุกเคสใช้ <code>FakeClock</code> ติ๊กช่องซ้ายสุดเมื่อเทสต์ผ่าน เบราว์เซอร์นี้จะจำไว้ให้</p>
+      <div class="tbl"><table id="acc">
+        <thead><tr><th class="chk">ผ่าน</th><th class="num">#</th><th>Given</th><th>When</th><th>Then</th></tr></thead>
+        <tbody>
+          <tr><td class="chk"><input type="checkbox" id="t1" aria-label="เคส 1"></td><td class="num">1</td><td>สมาชิก ACTIVE และ copy AVAILABLE</td><td>Borrow</td><td><span class="pill s2xx">201</span> <code>due_at = T0+14d</code> และ copy เป็น BORROWED</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t2" aria-label="เคส 2"></td><td class="num">2</td><td>สมาชิก SUSPENDED</td><td>Borrow</td><td><span class="pill s422">MEMBER_SUSPENDED</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t3" aria-label="เคส 3"></td><td class="num">3</td><td>ยืมอยู่แล้ว 3 เล่ม</td><td>Borrow เล่มที่ 4</td><td><span class="pill s422">LOAN_LIMIT_REACHED</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t4" aria-label="เคส 4"></td><td class="num">4</td><td>มี fine ค้าง <b>และ</b>ยืมอยู่ 3 เล่ม</td><td>Borrow</td><td><span class="pill s422">HAS_UNPAID_FINES</span> ตามลำดับการตรวจ</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t5" aria-label="เคส 5"></td><td class="num">5</td><td>มี loan ค้าง และตอนนี้ <code>T0+15d</code></td><td>Borrow เล่มอื่น</td><td><span class="pill s422">HAS_OVERDUE_LOANS</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t6" aria-label="เคส 6"></td><td class="num">6</td><td>copy ถูกยืมไปแล้ว</td><td>Borrow</td><td><span class="pill s409">COPY_NOT_AVAILABLE</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t7" aria-label="เคส 7"></td><td class="num">7</td><td>barcode ไม่มีในระบบ</td><td>Borrow</td><td><span class="pill s404">COPY_NOT_FOUND</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t8" aria-label="เคส 8"></td><td class="num">8</td><td>loan ปกติ ตอนนี้ <code>T0+10d</code></td><td>Renew</td><td><span class="pill s2xx">200</span> <code>due_at = T0+21d</code></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t9" aria-label="เคส 9"></td><td class="num">9</td><td>ต่ออายุไปแล้ว 1 ครั้ง</td><td>Renew</td><td><span class="pill s422">RENEW_LIMIT_REACHED</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t10" aria-label="เคส 10"></td><td class="num">10</td><td>ตอนนี้ <code>T0+14d+1s</code></td><td>Renew</td><td><span class="pill s422">LOAN_OVERDUE</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t11" aria-label="เคส 11"></td><td class="num">11</td><td>ตอนนี้ <code>T0+14d</code></td><td>Return</td><td><span class="pill s2xx">200</span> ไม่มี fine และ copy กลับเป็น AVAILABLE</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t12" aria-label="เคส 12"></td><td class="num">12</td><td>ตอนนี้ <code>T0+16d+1h</code></td><td>Return</td><td><span class="pill s2xx">200</span> fine = 30</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t13" aria-label="เคส 13"></td><td class="num">13</td><td>loan คืนไปแล้ว</td><td>Return</td><td><span class="pill s409">LOAN_ALREADY_RETURNED</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t14" aria-label="เคส 14"></td><td class="num">14</td><td>fine ยังไม่จ่าย</td><td>Pay</td><td><span class="pill s2xx">200</span> <code>paid_at</code> ถูกตั้งค่า และสมาชิกกลับมายืมได้</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t15" aria-label="เคส 15"></td><td class="num">15</td><td>fine จ่ายแล้ว</td><td>Pay</td><td><span class="pill s409">FINE_ALREADY_PAID</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t16" aria-label="เคส 16"></td><td class="num">16</td><td>email ซ้ำ</td><td>POST /members</td><td><span class="pill s409">EMAIL_ALREADY_EXISTS</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t17" aria-label="เคส 17"></td><td class="num">17</td><td>isbn = <code>"12345"</code></td><td>POST /books</td><td><span class="pill s400">VALIDATION_ERROR</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t18" aria-label="เคส 18"></td><td class="num">18</td><td>20 goroutine พร้อมกัน</td><td>Borrow copy เดียวกัน</td><td>สำเร็จ 1 ครั้ง และได้ <span class="pill s409">COPY_NOT_AVAILABLE</span> 19 ครั้ง</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t19" aria-label="เคส 19"></td><td class="num">19</td><td>ยืมค้าง 1 เล่ม ตอนนี้ <code>T0+20d</code></td><td>GET loans?status=overdue</td><td>ได้ loan นั้นกลับมา และ <code>status = OVERDUE</code></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 8 -->
+    <section id="bonus">
+      <h2><span class="n">08</span>Bonus <span class="muted" style="font-family:var(--f-body);font-size:15px;font-weight:400">ไม่บังคับ</span></h2>
+      <ul class="bonus">
+        <li><label for="b1"><input type="checkbox" id="b1"><span>Postgres adapter + migrations และสลับ adapter ด้วย env (<code>STORAGE=memory|postgres</code>) ได้โดยไม่แก้ core</span></label></li>
+        <li><label for="b2"><input type="checkbox" id="b2"><span>Integration test ที่ใช้ <code>testcontainers-go</code></span></label></li>
+        <li><label for="b3"><input type="checkbox" id="b3"><span><code>docker-compose.yml</code> สำหรับรัน API + DB</span></label></li>
+        <li><label for="b4"><input type="checkbox" id="b4"><span>Endpoint <code>POST /copies/{id}/lost</code> ที่คิดค่าปรับเท่าราคาหนังสือ (ต้องเพิ่ม field <code>price</code> ใน BOOKS)</span></label></li>
+        <li><label for="b5"><input type="checkbox" id="b5"><span>ตรวจ checksum ของ ISBN-13</span></label></li>
+        <li><label for="b6"><input type="checkbox" id="b6"><span>Graceful shutdown และ structured logging ด้วย <code>log/slog</code></span></label></li>
+        <li><label for="b7"><input type="checkbox" id="b7"><span>Architecture test ที่ fail เมื่อ <code>internal/core</code> ไป import <code>internal/adapter</code></span></label></li>
+      </ul>
+    </section>
+
+    <!-- 9 -->
+    <section id="score">
+      <h2><span class="n">09</span>เกณฑ์ให้คะแนน <span class="muted" style="font-family:var(--f-body);font-size:15px;font-weight:400">100 คะแนน</span></h2>
+      <div class="score">
+        <div class="r"><span class="lbl">แยก layer ถูกต้องตาม hexagonal (กฎในข้อ 6 ครบ)</span><span class="pts">25</span><span class="track"><i style="width:100%"></i></span></div>
+        <div class="r"><span class="lbl">Business rules ถูกต้องครบตามข้อ 3</span><span class="pts">25</span><span class="track"><i style="width:100%"></i></span></div>
+        <div class="r"><span class="lbl">คุณภาพเทสต์: ครอบคลุมเคส, ใช้ fake clock, table-driven, อ่านง่าย</span><span class="pts">25</span><span class="track"><i style="width:100%"></i></span></div>
+        <div class="r"><span class="lbl">Transaction และ concurrency (เคส #18 ผ่านเมื่อรันด้วย <code>-race</code>)</span><span class="pts">10</span><span class="track"><i style="width:40%"></i></span></div>
+        <div class="r"><span class="lbl">Error handling และการ map HTTP status สม่ำเสมอ</span><span class="pts">10</span><span class="track"><i style="width:40%"></i></span></div>
+        <div class="r"><span class="lbl">Code quality: การตั้งชื่อ, โครงสร้าง, README บอกวิธีรัน</span><span class="pts">5</span><span class="track"><i style="width:20%"></i></span></div>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="steps">
+      <h2><span class="n">10</span>ลำดับการทำที่แนะนำ</h2>
+      <ol class="steps">
+        <li><span><code>go mod init</code> แล้วสร้างโครงโฟลเดอร์ตามข้อ 6</span></li>
+        <li><span>เขียน <b>domain</b> + <code>CalculateFine</code> + เทสต์ ใช้ TDD ได้เลยเพราะเป็น pure function</span></li>
+        <li><span>นิยาม <b>ports</b> (interfaces)</span></li>
+        <li><span>เขียน <b>service</b> + fake repo + <code>FakeClock</code> + เทสต์ทุก error path</span></li>
+        <li><span>เขียน <b>in-memory adapter</b> + <code>TxManager</code> (mutex) + concurrency test</span></li>
+        <li><span>เขียน <b>HTTP adapter</b> + error mapping + <code>httptest</code></span></li>
+        <li><span>wiring ใน <code>cmd/api/main.go</code> แล้วลองยิงด้วย curl หรือ Postman</span></li>
+        <li><span>ถ้ามีเวลาเหลือ ค่อยทำ bonus</span></li>
+      </ol>
+    </section>
+  </main>
+</div>
+
+<div class="zoom" id="zoom" hidden role="dialog" aria-modal="true" aria-labelledby="zoomTitle">
+  <div class="zoom-bar">
+    <span class="ttl" id="zoomTitle">Diagram</span>
+    <button type="button" id="zOut" aria-label="ซูมออก">−</button>
+    <output id="zPct">100%</output>
+    <button type="button" id="zIn" aria-label="ซูมเข้า">+</button>
+    <button type="button" id="zFit">พอดีจอ</button>
+    <button type="button" id="zClose">ปิด ✕</button>
+  </div>
+  <div class="zoom-stage" id="zStage">
+    <div class="pan" id="zPan"></div>
+    <span class="zoom-hint">ลากเพื่อเลื่อน · scroll หรือถ่างสองนิ้วเพื่อซูม · Esc เพื่อปิด</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---- diagram zoom viewer ----
+  var zoom = document.getElementById('zoom'), stage = document.getElementById('zStage'), pan = document.getElementById('zPan');
+  var S = { k: 1, x: 0, y: 0, w: 0, h: 0 }, lastFocus = null;
+  function apply() {
+    pan.style.transform = 'translate(' + S.x + 'px,' + S.y + 'px) scale(' + S.k + ')';
+    document.getElementById('zPct').textContent = Math.round(S.k * 100) + '%';
+  }
+  function fit() {
+    var r = stage.getBoundingClientRect();
+    S.k = Math.min((r.width - 32) / S.w, (r.height - 32) / S.h, 3);
+    S.x = (r.width - S.w * S.k) / 2; S.y = (r.height - S.h * S.k) / 2; apply();
+  }
+  function zoomAt(f, cx, cy) {
+    var k = Math.min(Math.max(S.k * f, 0.2), 8); f = k / S.k;
+    S.x = cx - (cx - S.x) * f; S.y = cy - (cy - S.y) * f; S.k = k; apply();
+  }
+  function zoomCenter(f) { var r = stage.getBoundingClientRect(); zoomAt(f, r.width / 2, r.height / 2); }
+  function titleFor(d) {
+    var el = d.previousElementSibling;
+    while (el && !/^H[23]$/.test(el.tagName)) el = el.previousElementSibling;
+    return el ? el.textContent.trim() : 'Diagram';
+  }
+  function open(d) {
+    var svg = d.querySelector('svg:not(.zicon)');
+    if (!svg) return;
+    var vb = svg.viewBox && svg.viewBox.baseVal, box = svg.getBoundingClientRect();
+    S.w = vb && vb.width ? vb.width : box.width; S.h = vb && vb.height ? vb.height : box.height;
+    var c = svg.cloneNode(true);
+    c.removeAttribute('style'); c.setAttribute('width', S.w); c.setAttribute('height', S.h);
+    c.style.width = S.w + 'px'; c.style.height = S.h + 'px';
+    pan.replaceChildren(c);
+    document.getElementById('zoomTitle').textContent = titleFor(d);
+    lastFocus = document.activeElement;
+    zoom.hidden = false; document.body.style.overflow = 'hidden';
+    fit(); document.getElementById('zClose').focus();
+  }
+  function close() {
+    zoom.hidden = true; pan.replaceChildren(); document.body.style.overflow = '';
+    if (lastFocus) lastFocus.focus();
+  }
+  document.querySelectorAll('.diagram').forEach(function (d) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'zbtn'; b.textContent = '⤢ ขยาย';
+    b.setAttribute('aria-label', 'ขยายดู ' + titleFor(d));
+    b.addEventListener('click', function (e) { e.stopPropagation(); open(d); });
+    d.appendChild(b);
+    d.addEventListener('click', function () { open(d); });
+  });
+  document.getElementById('zIn').onclick = function () { zoomCenter(1.25); };
+  document.getElementById('zOut').onclick = function () { zoomCenter(0.8); };
+  document.getElementById('zFit').onclick = fit;
+  document.getElementById('zClose').onclick = close;
+  document.addEventListener('keydown', function (e) {
+    if (zoom.hidden) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === '+' || e.key === '=') zoomCenter(1.25);
+    else if (e.key === '-') zoomCenter(0.8);
+    else if (e.key === '0') fit();
+  });
+  window.addEventListener('resize', function () { if (!zoom.hidden) fit(); });
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = stage.getBoundingClientRect();
+    zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  var pts = new Map(), pinch = null;
+  stage.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    var sel = window.getSelection && window.getSelection();
+    if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    stage.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    stage.classList.add('drag');
+    if (pts.size === 2) { var a = Array.from(pts.values()); pinch = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
+  });
+  stage.addEventListener('pointermove', function (e) {
+    var p = pts.get(e.pointerId); if (!p) return;
+    var r = stage.getBoundingClientRect();
+    if (pts.size === 1) { S.x += e.clientX - p.x; S.y += e.clientY - p.y; apply(); }
+    p.x = e.clientX; p.y = e.clientY;
+    if (pts.size === 2 && pinch) {
+      var a = Array.from(pts.values()), dist = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+      zoomAt(dist / pinch, (a[0].x + a[1].x) / 2 - r.left, (a[0].y + a[1].y) / 2 - r.top);
+      pinch = dist;
+    }
+  });
+  function up(e) { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) stage.classList.remove('drag'); }
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  stage.addEventListener('selectstart', function (e) { e.preventDefault(); });
+  stage.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+  // ---- fine calculator (same formula as spec 3.4) ----
+  var due = document.getElementById('due'), ret = document.getElementById('ret');
+  var DAY = 86400000;
+  function fmtDur(ms) {
+    var m = Math.round(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    var parts = [];
+    if (d) parts.push(d + ' วัน');
+    if (h) parts.push(h + ' ชม.');
+    if (mi) parts.push(mi + ' นาที');
+    return parts.join(' ') || '0';
+  }
+  function calc() {
+    var d = new Date(due.value), r = new Date(ret.value);
+    var box = document.getElementById('rFineBox');
+    if (isNaN(d) || isNaN(r)) { document.getElementById('rFine').textContent = '—'; return; }
+    var late = r - d, days = 0, fine = 0;
+    if (late > 0) { days = Math.ceil(late / DAY); fine = Math.min(days * 10, 500); }
+    document.getElementById('rLate').textContent = late > 0 ? fmtDur(late) : 'ไม่ช้า';
+    document.getElementById('rDays').textContent = days;
+    document.getElementById('rFine').textContent = fine + ' ฿';
+    box.classList.toggle('zero', fine === 0);
+    document.getElementById('rFormula').textContent = late > 0
+      ? 'min(' + days + ' × 10, 500) = ' + fine + (days * 10 > 500 ? '  ← ติด cap' : '')
+      : 'lateDuration <= 0 → 0';
+  }
+  due.addEventListener('input', calc); ret.addEventListener('input', calc);
+  document.querySelectorAll('#fineTable tr.pick').forEach(function (tr) {
+    tr.addEventListener('click', function () { due.value = tr.dataset.d; ret.value = tr.dataset.r; calc(); });
+  });
+  calc();
+
+  // ---- checklist (per-viewer, localStorage) ----
+  var KEY = 'libloan-checks-v1', state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+  var boxes = document.querySelectorAll('#acc input[type=checkbox], .bonus input[type=checkbox]');
+  function refresh() {
+    var acc = document.querySelectorAll('#acc input[type=checkbox]'), n = 0;
+    acc.forEach(function (b) { if (b.checked) n++; b.closest('tr').classList.toggle('done', b.checked); });
+    document.getElementById('pcount').textContent = n + '/' + acc.length;
+    document.getElementById('pbar').style.width = (n / acc.length * 100) + '%';
+  }
+  boxes.forEach(function (b) {
+    if (state[b.id]) b.checked = true;
+    b.addEventListener('change', function () {
+      state[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      refresh();
+    });
+  });
+  refresh();
+
+  // ---- highlight current section in contents ----
+  var links = {};
+  document.querySelectorAll('nav.toc a').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          Object.keys(links).forEach(function (k) { links[k].classList.toggle('on', k === e.target.id); });
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('main section').forEach(function (s) { io.observe(s); });
+  }
+})();
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  const dark = document.documentElement.dataset.theme === 'dark' ||
+    (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default', fontFamily: '"IBM Plex Sans Thai", system-ui, sans-serif' });
+</script>
+
+</body>
+</html>
