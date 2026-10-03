@@ -6,6 +6,42 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+type dataResponse[T any] struct {
+	Message string `json:"message"`
+	Data    T      `json:"data,omitempty"`
+}
+
+func newOKResponse[T any](c fiber.Ctx, data T, message string) error {
+	return c.Status(fiber.StatusOK).JSON(dataResponse[T]{
+		Data:    data,
+		Message: message,
+	})
+}
+
+type errorResponse struct {
+	Error  string            `json:"error"`
+	Fields map[string]string `json:"fields,omitempty"`
+}
+
+func newErrorResponse(c fiber.Ctx, status int, err error) error {
+	return c.Status(status).JSON(errorResponse{
+		Error: err.Error(),
+	})
+}
+
+func newBadRequestResponse(c fiber.Ctx, err error) error {
+	fields, ok := validationFields(err)
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(errorResponse{
+			Error: "invalid request",
+		})
+	}
+	return c.Status(fiber.StatusBadRequest).JSON(errorResponse{
+		Error:  "validation failed",
+		Fields: fields,
+	})
+}
+
 type paginationMeta struct {
 	Page       int   `json:"page"`
 	Limit      int   `json:"limit"`
