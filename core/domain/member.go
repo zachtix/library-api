@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,4 +22,18 @@ type Member struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
+}
+
+var (
+	ErrMemberNotFound = errors.New("member not found")
+	ErrEmailTaken     = errors.New("email already taken")
+	ErrInvalidStatus  = errors.New("invalid member status")
+)
+
+func (s MemberStatus) Valid() bool {
+	switch s {
+	case MemberStatusActive, MemberStatusSuspended:
+		return true
+	}
+	return false
 }
