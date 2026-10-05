@@ -24,3 +24,21 @@ type MemberResponse struct {
 	CreatedAt time.Time           `json:"created_at"`
 	UpdatedAt time.Time           `json:"updated_at"`
 }
+
+func (r CreateMemberRequest) MemberToDomain() domain.Member {
+	return domain.Member{
+		Name:  r.Name,
+		Email: r.Email,
+	}
+}
+
+func MemberResponseFromDomain(m domain.Member) MemberResponse {
+	return MemberResponse{
+		ID:        m.ID,
+		Name:      m.Name,
+		Email:     m.Email,
+		Status:    m.Status,
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+	}
+}
