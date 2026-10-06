@@ -1,6 +1,7 @@
 package fiberadapter
 
 import (
+	"library/adapter/httpdto"
 	"library/core/domain"
 
 	"github.com/gofiber/fiber/v3"
@@ -12,33 +13,23 @@ type dataResponse[T any] struct {
 }
 
 func newOKResponse[T any](c fiber.Ctx, data T, message string) error {
-	return c.Status(fiber.StatusOK).JSON(dataResponse[T]{
+	return newDataResponse(c, fiber.StatusOK, data, message)
+}
+
+func newCreatedResponse[T any](c fiber.Ctx, data T, message string) error {
+	return newDataResponse(c, fiber.StatusCreated, data, message)
+}
+
+func newDataResponse[T any](c fiber.Ctx, status int, data T, message string) error {
+	return c.Status(status).JSON(dataResponse[T]{
 		Data:    data,
 		Message: message,
 	})
 }
 
-type errorResponse struct {
-	Error  string            `json:"error"`
-	Fields map[string]string `json:"fields,omitempty"`
-}
-
-func newErrorResponse(c fiber.Ctx, status int, err error) error {
-	return c.Status(status).JSON(errorResponse{
-		Error: err.Error(),
-	})
-}
-
-func newBadRequestResponse(c fiber.Ctx, err error) error {
-	fields, ok := validationFields(err)
-	if !ok {
-		return c.Status(fiber.StatusBadRequest).JSON(errorResponse{
-			Error: "invalid request",
-		})
-	}
-	return c.Status(fiber.StatusBadRequest).JSON(errorResponse{
-		Error:  "validation failed",
-		Fields: fields,
+func newErrorResponse(c fiber.Ctx, status int, code, message string, fields map[string]string) error {
+	return c.Status(status).JSON(httpdto.ErrorResponse{
+		Error: httpdto.ErrorBody{Code: code, Message: message, Fields: fields},
 	})
 }
 

@@ -9,17 +9,19 @@ import (
 )
 
 type memberServiceImpl struct {
-	repo outport.MemberRepository
+	repo  outport.MemberRepository
+	idGen outport.IDGenerator
 }
 
-func NewMemberService(repo outport.MemberRepository) inport.MemberService {
+func NewMemberService(repo outport.MemberRepository, idGen outport.IDGenerator) inport.MemberService {
 	return &memberServiceImpl{
-		repo: repo,
+		repo:  repo,
+		idGen: idGen,
 	}
 }
 
 func (s *memberServiceImpl) Create(member domain.Member) (domain.Member, error) {
-	member.ID = uuid.New()
+	member.ID = s.idGen.NewID()
 	member.Status = domain.MemberStatusActive
 
 	created, err := s.repo.Save(member)
@@ -28,6 +30,7 @@ func (s *memberServiceImpl) Create(member domain.Member) (domain.Member, error) 
 	}
 	return created, nil
 }
+
 func (s *memberServiceImpl) Get(id uuid.UUID) (domain.Member, error) {
 	member, err := s.repo.FindByID(id)
 	if err != nil {
@@ -35,6 +38,7 @@ func (s *memberServiceImpl) Get(id uuid.UUID) (domain.Member, error) {
 	}
 	return member, nil
 }
+
 func (s *memberServiceImpl) UpdateStatus(id uuid.UUID, status domain.MemberStatus) (domain.Member, error) {
 	if !status.Valid() {
 		return domain.Member{}, domain.ErrInvalidStatus
