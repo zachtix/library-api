@@ -30,6 +30,9 @@ var domainErrors = []struct {
 	{domain.ErrMemberNotFound, fiber.StatusNotFound, "MEMBER_NOT_FOUND"},
 	{domain.ErrEmailTaken, fiber.StatusConflict, "EMAIL_ALREADY_EXISTS"},
 	{domain.ErrInvalidStatus, fiber.StatusBadRequest, "VALIDATION_ERROR"},
+	{domain.ErrBookNotFound, fiber.StatusNotFound, "BOOK_NOT_FOUND"},
+	{domain.ErrIsbnTaken, fiber.StatusConflict, "ISBN_ALREADY_EXISTS"},
+	{domain.ErrBarcodeTaken, fiber.StatusConflict, "BARCODE_ALREADY_EXISTS"},
 }
 
 func ErrorHandler(c fiber.Ctx, err error) error {

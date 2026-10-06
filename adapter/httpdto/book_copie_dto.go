@@ -19,3 +19,20 @@ type BookCopieResponse struct {
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
 }
+
+func (r CreateBookCopieRequest) BookCopieToDomain() domain.BookCopie {
+	return domain.BookCopie{
+		Barcode: r.Barcode,
+	}
+}
+
+func ToBookCopieResponse(bc domain.BookCopie) BookCopieResponse {
+	return BookCopieResponse{
+		ID:        bc.ID,
+		BookID:    bc.BookID,
+		Barcode:   bc.Barcode,
+		Status:    bc.Status,
+		CreatedAt: bc.CreatedAt,
+		UpdatedAt: bc.UpdatedAt,
+	}
+}

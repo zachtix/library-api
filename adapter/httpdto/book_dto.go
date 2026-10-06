@@ -8,7 +8,7 @@ import (
 )
 
 type CreateBookRequest struct {
-	Isbn   string `json:"isbn" validate:"required,numeric,len=13"`
+	Isbn   string `json:"isbn" validate:"required,number,len=13"`
 	Title  string `json:"title" validate:"required"`
 	Author string `json:"author" validate:"required"`
 }
@@ -30,5 +30,13 @@ func ToBookResponse(b domain.Book) BookResponse {
 		Author:    b.Author,
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
+	}
+}
+
+func (r CreateBookRequest) BookToDomain() domain.Book {
+	return domain.Book{
+		Isbn:   r.Isbn,
+		Title:  r.Title,
+		Author: r.Author,
 	}
 }

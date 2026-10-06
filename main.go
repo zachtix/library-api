@@ -38,11 +38,19 @@ func main() {
 	memberRepo := gormadapter.NewGormMemberRepository(db)
 	memberService := service.NewMemberService(memberRepo, uuidadapter.NewUUIDGenerator())
 	memberHandler := fiberadapter.NewFiberMemberHandler(memberService)
-
 	membersRoute := app.Group("/members")
 	membersRoute.Post("", memberHandler.Create)
 	membersRoute.Get("/:id", memberHandler.Get)
 	membersRoute.Patch("/:id/status", memberHandler.UpdateStatus)
+
+	bookRepo := gormadapter.NewGormBookRepository(db)
+	bookService := service.NewBookService(bookRepo, uuidadapter.NewUUIDGenerator())
+	bookHandler := fiberadapter.NewFiberBookHandler(bookService)
+	booksRoute := app.Group("/books")
+	booksRoute.Post("", bookHandler.Create)
+	booksRoute.Get("", bookHandler.List)
+	booksRoute.Get("/:id", bookHandler.Get)
+	booksRoute.Post("/:id/copies", bookHandler.AddCopie)
 
 	log.Fatal(app.Listen(":8080"))
 }

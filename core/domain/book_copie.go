@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,3 +24,7 @@ type BookCopie struct {
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 }
+
+var (
+	ErrBarcodeTaken = errors.New("barcode already taken")
+)
