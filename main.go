@@ -1,6 +1,7 @@
 package main
 
 import (
+	"library/adapter/clockadapter"
 	"library/adapter/fiberadapter"
 	"library/adapter/gormadapter"
 	"library/adapter/uuidadapter"
@@ -35,6 +36,8 @@ func main() {
 		})
 	})
 
+	tx := gormadapter.NewGormTx(db)
+
 	memberRepo := gormadapter.NewGormMemberRepository(db)
 	memberService := service.NewMemberService(memberRepo, uuidadapter.NewUUIDGenerator())
 	memberHandler := fiberadapter.NewFiberMemberHandler(memberService)
@@ -51,6 +54,14 @@ func main() {
 	booksRoute.Get("", bookHandler.List)
 	booksRoute.Get("/:id", bookHandler.Get)
 	booksRoute.Post("/:id/copies", bookHandler.AddCopie)
+
+	loanRepo := gormadapter.NewGormLoanRepository(db)
+	loanService := service.NewLoanService(loanRepo, uuidadapter.NewUUIDGenerator(), tx, clockadapter.NewClock())
+	loanHandler := fiberadapter.NewFiberLoanHandler(loanService)
+	loanRoute := app.Group("/loans")
+	loanRoute.Post("", loanHandler.Borrow)
+	loanRoute.Post("/:id/renew", loanHandler.Renew)
+	loanRoute.Post("/:id/return", loanHandler.Return)
 
 	log.Fatal(app.Listen(":8080"))
 }

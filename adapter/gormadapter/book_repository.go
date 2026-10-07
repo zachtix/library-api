@@ -79,3 +79,7 @@ func (r *GormBookRepository) List(page domain.PageRequest, filter domain.BookFil
 	}
 	return books, total, nil
 }
+
+func (r *GormBookRepository) FindCopieByBarcode(barcode string) (domain.BookCopie, error)
+
+func (r *GormBookRepository) UpdateCopieStatus(id uuid.UUID, status domain.BookStatus) error

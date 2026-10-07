@@ -33,6 +33,16 @@ var domainErrors = []struct {
 	{domain.ErrBookNotFound, fiber.StatusNotFound, "BOOK_NOT_FOUND"},
 	{domain.ErrIsbnTaken, fiber.StatusConflict, "ISBN_ALREADY_EXISTS"},
 	{domain.ErrBarcodeTaken, fiber.StatusConflict, "BARCODE_ALREADY_EXISTS"},
+	{domain.ErrMemberSuspended, fiber.StatusUnprocessableEntity, "MEMBER_SUSPENDED"},
+	{domain.ErrHasUnpaidFines, fiber.StatusUnprocessableEntity, "HAS_UNPAID_FINES"},
+	{domain.ErrHasOverdueLoans, fiber.StatusUnprocessableEntity, "HAS_OVERDUE_LOANS"},
+	{domain.ErrLoanLimitReached, fiber.StatusUnprocessableEntity, "LOAN_LIMIT_REACHED"},
+	{domain.ErrCopyNotFound, fiber.StatusNotFound, "COPY_NOT_FOUND"},
+	{domain.ErrCopyNotAvailable, fiber.StatusConflict, "COPY_NOT_AVAILABLE"},
+	{domain.ErrLoanNotFound, fiber.StatusNotFound, "LOAN_NOT_FOUND"},
+	{domain.ErrLoanAlreadyReturned, fiber.StatusConflict, "LOAN_ALREADY_RETURNED"},
+	{domain.ErrLoanOverdue, fiber.StatusUnprocessableEntity, "LOAN_OVERDUE"},
+	{domain.ErrRenewLimitReached, fiber.StatusUnprocessableEntity, "RENEW_LIMIT_REACHED"},
 }
 
 func ErrorHandler(c fiber.Ctx, err error) error {
