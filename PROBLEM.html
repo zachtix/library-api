@@ -390,6 +390,7 @@ erDiagram
         <ul>
           <li>เงินเก็บเป็น integer (<code>int64</code>) ห้ามใช้ float</li>
           <li>สถานะของ loan (<code>ACTIVE</code> / <code>OVERDUE</code> / <code>RETURNED</code>) <b>ไม่ต้องเก็บใน DB</b> ให้คำนวณจาก <code>returned_at</code>, <code>due_at</code> และเวลาปัจจุบัน</li>
+          <li><b>กำหนดคืนนับเป็นวัน ไม่นับเวลา</b> ใช้วันตามปฏิทินของ <code>Asia/Bangkok</code> (UTC+7) ถ้าครบกำหนดวันที่ 15 จะคืนกี่โมงของวันที่ 15 ก็ไม่ถือว่าเกินกำหนด เก็บ <code>due_at</code> เป็น <code>23:59:59 +07:00</code> ของวันครบกำหนด และเช็คการเกินกำหนดด้วย <code>date(now) &gt; date(due_at)</code></li>
           <li>ถ้าใช้ Postgres ควรมี <code>UNIQUE (copy_id) WHERE returned_at IS NULL</code> เป็นด่านสุดท้ายกันการยืมซ้อน</li>
         </ul>
       </div>
@@ -413,7 +414,7 @@ erDiagram
           <tr><td class="num">7</td><td>เล่มนั้นมีสถานะ <code>AVAILABLE</code></td><td><span class="pill s409">COPY_NOT_AVAILABLE</span></td></tr>
         </tbody>
       </table></div>
-      <p>ถ้าผ่านครบทุกข้อ ให้สร้าง loan โดย <code>borrowed_at = now</code> และ <code>due_at = now + 14 วัน</code> แล้วเปลี่ยน copy เป็น <code>BORROWED</code> ทั้งสองขั้นตอนต้องอยู่ใน<b>transaction เดียวกัน</b></p>
+      <p>ถ้าผ่านครบทุกข้อ ให้สร้าง loan โดย <code>borrowed_at = now</code> และ <code>due_at = สิ้นวันของ (date(now) + 14 วัน)</code> (ยืมวันที่ 1 กี่โมงก็ได้ จะครบกำหนดวันที่ 15 เวลา 23:59:59) แล้วเปลี่ยน copy เป็น <code>BORROWED</code> ทั้งสองขั้นตอนต้องอยู่ใน<b>transaction เดียวกัน</b></p>
 
       <h3>3.2 การต่ออายุ (Renew)</h3>
       <div class="tbl"><table>
@@ -421,11 +422,11 @@ erDiagram
         <tbody>
           <tr><td class="num">1</td><td>มี loan นี้อยู่</td><td><span class="pill s404">LOAN_NOT_FOUND</span></td></tr>
           <tr><td class="num">2</td><td>ยังไม่ได้คืน</td><td><span class="pill s409">LOAN_ALREADY_RETURNED</span></td></tr>
-          <tr><td class="num">3</td><td>ยังไม่เกินกำหนด (<code>now &lt;= due_at</code>)</td><td><span class="pill s422">LOAN_OVERDUE</span></td></tr>
+          <tr><td class="num">3</td><td>ยังไม่เกินกำหนด (<code>date(now) &lt;= date(due_at)</code>)</td><td><span class="pill s422">LOAN_OVERDUE</span></td></tr>
           <tr><td class="num">4</td><td>ยังไม่เคยต่ออายุ (<code>renew_count == 0</code>)</td><td><span class="pill s422">RENEW_LIMIT_REACHED</span></td></tr>
         </tbody>
       </table></div>
-      <p>ถ้าผ่าน ให้ตั้ง <code>due_at = due_at + 7 วัน</code> (นับต่อจาก due เดิม ไม่ใช่จาก now) และ <code>renew_count = 1</code></p>
+      <p>ถ้าผ่าน ให้ตั้ง <code>due_at = สิ้นวันของ (date(due_at) + 7 วัน)</code> (นับต่อจาก due เดิม ไม่ใช่จาก now) และ <code>renew_count = 1</code> ดังนั้นจะต่อวันไหนก็ได้จนถึงวันครบกำหนด ผลจะได้รวม 21 วันเสมอ (ยืมวันที่ 1 ครบกำหนดใหม่วันที่ 22)</p>
 
       <h3>3.3 การคืน (Return)</h3>
       <div class="tbl"><table>
@@ -438,18 +439,17 @@ erDiagram
       <p>ถ้าผ่าน ให้ตั้ง <code>returned_at = now</code> เปลี่ยน copy กลับเป็น <code>AVAILABLE</code> แล้วคำนวณค่าปรับ ถ้าค่าปรับมากกว่า 0 ให้สร้าง record ใน <code>FINES</code> ทุกขั้นตอนอยู่ใน transaction เดียวกัน</p>
 
       <h3>3.4 สูตรค่าปรับ</h3>
-<pre class="code">lateDuration = returned_at - due_at
-ถ้า lateDuration &lt;= 0          → ค่าปรับ 0
-lateDays     = ceil(lateDuration / 24h)   // เศษของวันนับเป็น 1 วัน
-fine         = min(lateDays × 10, 500)    // วันละ 10 บาท สูงสุด 500 บาท</pre>
+<pre class="code">lateDays = date(returned_at) - date(due_at)   // นับเป็นวันตามปฏิทิน Asia/Bangkok ไม่สนเวลา
+ถ้า lateDays &lt;= 0              → ค่าปรับ 0
+fine     = min(lateDays × 10, 500)            // วันละ 10 บาท สูงสุด 500 บาท</pre>
 
       <div class="calc" aria-label="ลองคำนวณค่าปรับ">
         <div class="row">
-          <label for="due">due_at<input type="datetime-local" id="due" value="2026-10-14T10:00"></label>
-          <label for="ret">returned_at<input type="datetime-local" id="ret" value="2026-10-16T09:00"></label>
+          <label for="due">วันครบกำหนด (due_at)<input type="date" id="due" value="2026-10-15"></label>
+          <label for="ret">returned_at (เวลาไทย)<input type="datetime-local" id="ret" value="2026-10-17T09:00"></label>
         </div>
         <div class="result" aria-live="polite">
-          <div><small>คืนช้า</small><strong id="rLate">—</strong></div>
+          <div><small>คืนช้า (วัน)</small><strong id="rLate">—</strong></div>
           <div><small>lateDays</small><strong id="rDays">—</strong></div>
           <div class="fine" id="rFineBox"><small>ค่าปรับ</small><strong id="rFine">—</strong></div>
         </div>
@@ -458,13 +458,14 @@ fine         = min(lateDays × 10, 500)    // วันละ 10 บาท ส�
 
       <p class="muted" style="font-size:14px">กดแถวในตารางเพื่อโหลดตัวอย่างนั้นเข้าเครื่องคำนวณ ทุกแถวต้องอยู่ใน table-driven test ของคุณด้วย</p>
       <div class="tbl"><table id="fineTable">
-        <thead><tr><th>due_at</th><th>returned_at</th><th class="num">ค่าปรับ (บาท)</th></tr></thead>
+        <thead><tr><th>due_at (วันที่)</th><th>returned_at (เวลาไทย)</th><th class="num">ค่าปรับ (บาท)</th></tr></thead>
         <tbody>
-          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-14T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-14 10:00</td><td class="num">0</td></tr>
-          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-14T10:01"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-14 10:01</td><td class="num">10</td></tr>
-          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-15T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-15 10:00</td><td class="num">10</td></tr>
-          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-10-16T09:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-10-16 09:00</td><td class="num">20</td></tr>
-          <tr class="pick" data-d="2026-10-14T10:00" data-r="2026-12-13T10:00"><td class="mono">2026-10-14 10:00</td><td class="mono">2026-12-13 10:00</td><td class="num">500 <span class="muted">(60 วัน, ติด cap)</span></td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-10-15T08:00"><td class="mono">2026-10-15</td><td class="mono">2026-10-15 08:00</td><td class="num">0</td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-10-15T23:59"><td class="mono">2026-10-15</td><td class="mono">2026-10-15 23:59</td><td class="num">0 <span class="muted">(วันเดียวกัน)</span></td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-10-16T00:01"><td class="mono">2026-10-15</td><td class="mono">2026-10-16 00:01</td><td class="num">10</td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-10-16T23:59"><td class="mono">2026-10-15</td><td class="mono">2026-10-16 23:59</td><td class="num">10</td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-10-17T09:00"><td class="mono">2026-10-15</td><td class="mono">2026-10-17 09:00</td><td class="num">20</td></tr>
+          <tr class="pick" data-d="2026-10-15" data-r="2026-12-14T10:00"><td class="mono">2026-10-15</td><td class="mono">2026-12-14 10:00</td><td class="num">500 <span class="muted">(60 วัน, ติด cap)</span></td></tr>
         </tbody>
       </table></div>
 
@@ -513,8 +514,8 @@ Content-Type: application/json
   "id": "a93f…",
   "member_id": "7b1c…",
   "copy_id": "c02d…",
-  "borrowed_at": "2026-10-01T10:00:00Z",
-  "due_at": "2026-10-15T10:00:00Z",
+  "borrowed_at": "2026-10-01T10:00:00+07:00",
+  "due_at": "2026-10-15T23:59:59+07:00",
   "returned_at": null,
   "renew_count": 0,
   "status": "ACTIVE"
@@ -622,7 +623,7 @@ flowchart TD
     C6 -- ไม่ --> E6[404 COPY_NOT_FOUND]
     C6 -- ใช่ --> C7{AVAILABLE?}
     C7 -- ไม่ --> E7[409 COPY_NOT_AVAILABLE]
-    C7 -- ใช่ --> W[สร้าง Loan due = now+14d&lt;br/&gt;Copy → BORROWED]
+    C7 -- ใช่ --> W[สร้าง Loan due = สิ้นวันของ วันนี้+14d&lt;br/&gt;Copy → BORROWED]
     W --> CM(Commit)
     CM --> OK([201 Created])
 </pre>
@@ -688,7 +689,7 @@ stateDiagram-v2
     direction LR
     [*] --> ACTIVE: borrow
     ACTIVE --> ACTIVE: renew (ครั้งเดียว)
-    ACTIVE --> OVERDUE: now > due_at
+    ACTIVE --> OVERDUE: date(now) > date(due_at)
     ACTIVE --> RETURNED: return (ไม่มีค่าปรับ)
     OVERDUE --> RETURNED: return (มีค่าปรับ)
     RETURNED --> [*]
@@ -768,29 +769,29 @@ type LoanRepository interface {
       </div>
 
       <h3>Acceptance test cases ขั้นต่ำ</h3>
-      <p class="muted" style="font-size:14px"><code>T0</code> คือเวลาที่ยืม และทุกเคสใช้ <code>FakeClock</code> ติ๊กช่องซ้ายสุดเมื่อเทสต์ผ่าน เบราว์เซอร์นี้จะจำไว้ให้</p>
+      <p class="muted" style="font-size:14px">ทุกเคสใช้ <code>FakeClock</code> โดยยืมตอน <code>2026-10-01 10:00 +07:00</code> (เวลาไทยทั้งหมด) due ปกติคือวันที่ 15 และหลังต่ออายุคือวันที่ 22 ติ๊กช่องซ้ายสุดเมื่อเทสต์ผ่าน เบราว์เซอร์นี้จะจำไว้ให้</p>
       <div class="tbl"><table id="acc">
         <thead><tr><th class="chk">ผ่าน</th><th class="num">#</th><th>Given</th><th>When</th><th>Then</th></tr></thead>
         <tbody>
-          <tr><td class="chk"><input type="checkbox" id="t1" aria-label="เคส 1"></td><td class="num">1</td><td>สมาชิก ACTIVE และ copy AVAILABLE</td><td>Borrow</td><td><span class="pill s2xx">201</span> <code>due_at = T0+14d</code> และ copy เป็น BORROWED</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t1" aria-label="เคส 1"></td><td class="num">1</td><td>สมาชิก ACTIVE และ copy AVAILABLE</td><td>Borrow</td><td><span class="pill s2xx">201</span> <code>due_at = 2026-10-15T23:59:59+07:00</code> และ copy เป็น BORROWED</td></tr>
           <tr><td class="chk"><input type="checkbox" id="t2" aria-label="เคส 2"></td><td class="num">2</td><td>สมาชิก SUSPENDED</td><td>Borrow</td><td><span class="pill s422">MEMBER_SUSPENDED</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t3" aria-label="เคส 3"></td><td class="num">3</td><td>ยืมอยู่แล้ว 3 เล่ม</td><td>Borrow เล่มที่ 4</td><td><span class="pill s422">LOAN_LIMIT_REACHED</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t4" aria-label="เคส 4"></td><td class="num">4</td><td>มี fine ค้าง <b>และ</b>ยืมอยู่ 3 เล่ม</td><td>Borrow</td><td><span class="pill s422">HAS_UNPAID_FINES</span> ตามลำดับการตรวจ</td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t5" aria-label="เคส 5"></td><td class="num">5</td><td>มี loan ค้าง และตอนนี้ <code>T0+15d</code></td><td>Borrow เล่มอื่น</td><td><span class="pill s422">HAS_OVERDUE_LOANS</span></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t5" aria-label="เคส 5"></td><td class="num">5</td><td>มี loan ค้าง และตอนนี้ <code>10-16 00:00</code></td><td>Borrow เล่มอื่น</td><td><span class="pill s422">HAS_OVERDUE_LOANS</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t6" aria-label="เคส 6"></td><td class="num">6</td><td>copy ถูกยืมไปแล้ว</td><td>Borrow</td><td><span class="pill s409">COPY_NOT_AVAILABLE</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t7" aria-label="เคส 7"></td><td class="num">7</td><td>barcode ไม่มีในระบบ</td><td>Borrow</td><td><span class="pill s404">COPY_NOT_FOUND</span></td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t8" aria-label="เคส 8"></td><td class="num">8</td><td>loan ปกติ ตอนนี้ <code>T0+10d</code></td><td>Renew</td><td><span class="pill s2xx">200</span> <code>due_at = T0+21d</code></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t8" aria-label="เคส 8"></td><td class="num">8</td><td>loan ปกติ ตอนนี้ <code>10-11 10:00</code></td><td>Renew</td><td><span class="pill s2xx">200</span> <code>due_at = 2026-10-22T23:59:59+07:00</code></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t9" aria-label="เคส 9"></td><td class="num">9</td><td>ต่ออายุไปแล้ว 1 ครั้ง</td><td>Renew</td><td><span class="pill s422">RENEW_LIMIT_REACHED</span></td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t10" aria-label="เคส 10"></td><td class="num">10</td><td>ตอนนี้ <code>T0+14d+1s</code></td><td>Renew</td><td><span class="pill s422">LOAN_OVERDUE</span></td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t11" aria-label="เคส 11"></td><td class="num">11</td><td>ตอนนี้ <code>T0+14d</code></td><td>Return</td><td><span class="pill s2xx">200</span> ไม่มี fine และ copy กลับเป็น AVAILABLE</td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t12" aria-label="เคส 12"></td><td class="num">12</td><td>ตอนนี้ <code>T0+16d+1h</code></td><td>Return</td><td><span class="pill s2xx">200</span> fine = 30</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t10" aria-label="เคส 10"></td><td class="num">10</td><td>ตอนนี้ <code>10-16 00:00</code></td><td>Renew</td><td><span class="pill s422">LOAN_OVERDUE</span> (ถ้าเป็น <code>10-15 23:59</code> ต้องต่อได้)</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t11" aria-label="เคส 11"></td><td class="num">11</td><td>ตอนนี้ <code>10-15 23:59</code></td><td>Return</td><td><span class="pill s2xx">200</span> ไม่มี fine และ copy กลับเป็น AVAILABLE</td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t12" aria-label="เคส 12"></td><td class="num">12</td><td>ตอนนี้ <code>10-18 09:00</code></td><td>Return</td><td><span class="pill s2xx">200</span> fine = 30</td></tr>
           <tr><td class="chk"><input type="checkbox" id="t13" aria-label="เคส 13"></td><td class="num">13</td><td>loan คืนไปแล้ว</td><td>Return</td><td><span class="pill s409">LOAN_ALREADY_RETURNED</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t14" aria-label="เคส 14"></td><td class="num">14</td><td>fine ยังไม่จ่าย</td><td>Pay</td><td><span class="pill s2xx">200</span> <code>paid_at</code> ถูกตั้งค่า และสมาชิกกลับมายืมได้</td></tr>
           <tr><td class="chk"><input type="checkbox" id="t15" aria-label="เคส 15"></td><td class="num">15</td><td>fine จ่ายแล้ว</td><td>Pay</td><td><span class="pill s409">FINE_ALREADY_PAID</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t16" aria-label="เคส 16"></td><td class="num">16</td><td>email ซ้ำ</td><td>POST /members</td><td><span class="pill s409">EMAIL_ALREADY_EXISTS</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t17" aria-label="เคส 17"></td><td class="num">17</td><td>isbn = <code>"12345"</code></td><td>POST /books</td><td><span class="pill s400">VALIDATION_ERROR</span></td></tr>
           <tr><td class="chk"><input type="checkbox" id="t18" aria-label="เคส 18"></td><td class="num">18</td><td>20 goroutine พร้อมกัน</td><td>Borrow copy เดียวกัน</td><td>สำเร็จ 1 ครั้ง และได้ <span class="pill s409">COPY_NOT_AVAILABLE</span> 19 ครั้ง</td></tr>
-          <tr><td class="chk"><input type="checkbox" id="t19" aria-label="เคส 19"></td><td class="num">19</td><td>ยืมค้าง 1 เล่ม ตอนนี้ <code>T0+20d</code></td><td>GET loans?status=overdue</td><td>ได้ loan นั้นกลับมา และ <code>status = OVERDUE</code></td></tr>
+          <tr><td class="chk"><input type="checkbox" id="t19" aria-label="เคส 19"></td><td class="num">19</td><td>ยืมค้าง 1 เล่ม ตอนนี้ <code>10-21 10:00</code></td><td>GET loans?status=overdue</td><td>ได้ loan นั้นกลับมา และ <code>status = OVERDUE</code></td></tr>
         </tbody>
       </table></div>
     </section>
@@ -950,27 +951,24 @@ type LoanRepository interface {
   // ---- fine calculator (same formula as spec 3.4) ----
   var due = document.getElementById('due'), ret = document.getElementById('ret');
   var DAY = 86400000;
-  function fmtDur(ms) {
-    var m = Math.round(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
-    var parts = [];
-    if (d) parts.push(d + ' วัน');
-    if (h) parts.push(h + ' ชม.');
-    if (mi) parts.push(mi + ' นาที');
-    return parts.join(' ') || '0';
+  // date part only: time of day never matters (all values are Thai local time)
+  function dayNum(v) {
+    var p = (v || '').slice(0, 10).split('-').map(Number);
+    return p.length === 3 && p.every(isFinite) ? Date.UTC(p[0], p[1] - 1, p[2]) / DAY : NaN;
   }
   function calc() {
-    var d = new Date(due.value), r = new Date(ret.value);
+    var d = dayNum(due.value), r = dayNum(ret.value);
     var box = document.getElementById('rFineBox');
     if (isNaN(d) || isNaN(r)) { document.getElementById('rFine').textContent = '—'; return; }
     var late = r - d, days = 0, fine = 0;
-    if (late > 0) { days = Math.ceil(late / DAY); fine = Math.min(days * 10, 500); }
-    document.getElementById('rLate').textContent = late > 0 ? fmtDur(late) : 'ไม่ช้า';
+    if (late > 0) { days = late; fine = Math.min(days * 10, 500); }
+    document.getElementById('rLate').textContent = late > 0 ? late + ' วัน' : 'ไม่ช้า';
     document.getElementById('rDays').textContent = days;
     document.getElementById('rFine').textContent = fine + ' ฿';
     box.classList.toggle('zero', fine === 0);
     document.getElementById('rFormula').textContent = late > 0
       ? 'min(' + days + ' × 10, 500) = ' + fine + (days * 10 > 500 ? '  ← ติด cap' : '')
-      : 'lateDuration <= 0 → 0';
+      : 'lateDays <= 0 → 0';
   }
   due.addEventListener('input', calc); ret.addEventListener('input', calc);
   document.querySelectorAll('#fineTable tr.pick').forEach(function (tr) {

@@ -74,6 +74,9 @@ erDiagram
 
 - เงินเก็บเป็น **integer** (`int64`) ห้ามใช้ float
 - สถานะของ loan (`ACTIVE` / `OVERDUE` / `RETURNED`) **ไม่ต้องเก็บใน DB** ให้คำนวณจาก `returned_at`, `due_at` และเวลาปัจจุบัน
+- **กำหนดคืนนับเป็นวัน ไม่นับเวลา** ใช้วันตามปฏิทินของเขตเวลา `Asia/Bangkok` (UTC+7) ถ้าครบกำหนดวันที่ 15 จะคืนกี่โมงของวันที่ 15 ก็ไม่ถือว่าเกินกำหนด
+  - เก็บ `due_at` เป็นเวลาสิ้นวันของวันครบกำหนด คือ `23:59:59 +07:00` เพื่อให้อ่านง่าย
+  - ส่วนการเช็คว่าเกินกำหนดหรือยัง ให้เทียบที่**วันที่** คือ `date(now) > date(due_at)` ไม่ต้องเทียบเวลา
 - (ถ้าใช้ Postgres) ควรมี partial unique index `UNIQUE (copy_id) WHERE returned_at IS NULL` เป็นด่านสุดท้ายกันการยืมซ้อน
 
 ---
@@ -95,7 +98,8 @@ erDiagram
 | 7 | เล่มนั้นมีสถานะ `AVAILABLE` | `COPY_NOT_AVAILABLE` |
 
 ถ้าผ่านครบทุกข้อ
-- สร้าง loan โดย `borrowed_at = now` และ `due_at = now + 14 วัน`
+- สร้าง loan โดย `borrowed_at = now` และ `due_at = สิ้นวันของ (date(now) + 14 วัน)`
+  - เช่น ยืมวันที่ 1 จะยืมกี่โมงก็ได้ `due_at = วันที่ 15 23:59:59 +07:00`
 - เปลี่ยนสถานะ copy เป็น `BORROWED`
 - สองขั้นตอนนี้ต้องอยู่ใน **transaction เดียวกัน**
 
@@ -105,10 +109,12 @@ erDiagram
 |---|---|---|
 | 1 | มี loan นี้อยู่ | `LOAN_NOT_FOUND` |
 | 2 | ยังไม่ได้คืน | `LOAN_ALREADY_RETURNED` |
-| 3 | ยังไม่เกินกำหนด (`now <= due_at`) | `LOAN_OVERDUE` |
+| 3 | ยังไม่เกินกำหนด (`date(now) <= date(due_at)`) | `LOAN_OVERDUE` |
 | 4 | ยังไม่เคยต่ออายุ (`renew_count == 0`) | `RENEW_LIMIT_REACHED` |
 
-ถ้าผ่าน ให้ตั้ง `due_at = due_at + 7 วัน` (นับจาก due เดิม ไม่ใช่จาก now) และ `renew_count = 1`
+ถ้าผ่าน ให้ตั้ง `due_at = สิ้นวันของ (date(due_at) + 7 วัน)` (นับจาก due เดิม ไม่ใช่จาก now) และ `renew_count = 1`
+
+ดังนั้นจะต่ออายุวันไหนก็ได้ตั้งแต่วันที่ยืมจนถึงวันครบกำหนด ผลลัพธ์จะเหมือนกันเสมอ คือได้รวม 21 วัน เช่น ยืมวันที่ 1 จะครบกำหนดใหม่วันที่ 22
 
 ### 3.3 การคืน (Return)
 
@@ -125,19 +131,21 @@ erDiagram
 ### 3.4 สูตรค่าปรับ
 
 ```
-lateDuration = returned_at - due_at
-ถ้า lateDuration <= 0          → ค่าปรับ 0
-lateDays     = ceil(lateDuration / 24h)   // เศษของวันนับเป็น 1 วัน
-fine         = min(lateDays × 10, 500)    // วันละ 10 บาท สูงสุด 500 บาท
+lateDays = date(returned_at) - date(due_at)   // นับเป็นวันตามปฏิทิน Asia/Bangkok ไม่สนเวลา
+ถ้า lateDays <= 0              → ค่าปรับ 0
+fine     = min(lateDays × 10, 500)            // วันละ 10 บาท สูงสุด 500 บาท
 ```
 
 | due_at | returned_at | ค่าปรับ |
 |---|---|---|
-| 2026-10-14 10:00 | 2026-10-14 10:00 | 0 |
-| 2026-10-14 10:00 | 2026-10-14 10:01 | 10 |
-| 2026-10-14 10:00 | 2026-10-15 10:00 | 10 |
-| 2026-10-14 10:00 | 2026-10-16 09:00 | 20 |
-| 2026-10-14 10:00 | 2026-12-13 10:00 | 500 (60 วัน → โดน cap) |
+| 2026-10-15 | 2026-10-15 08:00 | 0 |
+| 2026-10-15 | 2026-10-15 23:59 | 0 (วันเดียวกัน กี่โมงก็ได้) |
+| 2026-10-15 | 2026-10-16 00:01 | 10 |
+| 2026-10-15 | 2026-10-16 23:59 | 10 |
+| 2026-10-15 | 2026-10-17 09:00 | 20 |
+| 2026-10-15 | 2026-12-14 10:00 | 500 (60 วัน → โดน cap) |
+
+เวลาในตารางเป็นเวลาไทย (`+07:00`) ส่วน `due_at` แสดงแค่วันที่ เพราะเวลาไม่มีผล
 
 ### 3.5 การชำระค่าปรับ
 
@@ -186,8 +194,8 @@ Content-Type: application/json
   "id": "a93f...",
   "member_id": "7b1c...",
   "copy_id": "c02d...",
-  "borrowed_at": "2026-10-01T10:00:00Z",
-  "due_at": "2026-10-15T10:00:00Z",
+  "borrowed_at": "2026-10-01T10:00:00+07:00",
+  "due_at": "2026-10-15T23:59:59+07:00",
   "returned_at": null,
   "renew_count": 0,
   "status": "ACTIVE"
@@ -201,7 +209,7 @@ POST /loans/a93f.../return
 
 200 OK
 {
-  "loan": { "...": "...", "status": "RETURNED", "returned_at": "2026-10-17T12:00:00Z" },
+  "loan": { "...": "...", "status": "RETURNED", "returned_at": "2026-10-18T12:00:00+07:00" },
   "fine": { "id": "f11e...", "amount": 30, "paid_at": null }
 }
 ```
@@ -279,7 +287,7 @@ flowchart TD
     C6 -- ไม่ --> E6[404 COPY_NOT_FOUND]
     C6 -- ใช่ --> C7{AVAILABLE?}
     C7 -- ไม่ --> E7[409 COPY_NOT_AVAILABLE]
-    C7 -- ใช่ --> W[สร้าง Loan due = now+14d<br/>Copy → BORROWED]
+    C7 -- ใช่ --> W[สร้าง Loan due = สิ้นวันของ วันนี้+14d<br/>Copy → BORROWED]
     W --> CM(Commit)
     CM --> OK([201 Created])
 ```
@@ -343,7 +351,7 @@ stateDiagram-v2
     direction LR
     [*] --> ACTIVE: borrow
     ACTIVE --> ACTIVE: renew (ครั้งเดียว)
-    ACTIVE --> OVERDUE: now > due_at
+    ACTIVE --> OVERDUE: date(now) > date(due_at)
     ACTIVE --> RETURNED: return (ไม่มีค่าปรับ)
     OVERDUE --> RETURNED: return (มีค่าปรับ)
     RETURNED --> [*]
@@ -418,29 +426,29 @@ type LoanRepository interface {
 
 ### Acceptance Test Cases ขั้นต่ำ
 
-ในตารางนี้ `T0` คือเวลาที่ยืม และทุกเคสใช้ `FakeClock`
+ในตารางนี้ทุกเคสใช้ `FakeClock` โดยยืมตอน `2026-10-01 10:00 +07:00` (เวลาไทยทั้งหมด) ดังนั้น due ปกติคือวันที่ 15 และหลังต่ออายุคือวันที่ 22
 
 | # | Given | When | Then |
 |---|---|---|---|
-| 1 | สมาชิก ACTIVE, copy AVAILABLE | Borrow | 201, `due_at = T0+14d`, copy เป็น BORROWED |
+| 1 | สมาชิก ACTIVE, copy AVAILABLE | Borrow | 201, `due_at = 2026-10-15T23:59:59+07:00`, copy เป็น BORROWED |
 | 2 | สมาชิก SUSPENDED | Borrow | 422 `MEMBER_SUSPENDED` |
 | 3 | สมาชิกยืมอยู่แล้ว 3 เล่ม | Borrow เล่มที่ 4 | 422 `LOAN_LIMIT_REACHED` |
 | 4 | สมาชิกมี fine ค้าง **และ** ยืมอยู่ 3 เล่ม | Borrow | 422 `HAS_UNPAID_FINES` (ต้องเป็นไปตามลำดับการตรวจ) |
-| 5 | มี loan ค้างอยู่ และตอนนี้ `T0+15d` | Borrow เล่มอื่น | 422 `HAS_OVERDUE_LOANS` |
+| 5 | มี loan ค้างอยู่ และตอนนี้ `10-16 00:00` | Borrow เล่มอื่น | 422 `HAS_OVERDUE_LOANS` |
 | 6 | copy ถูกยืมไปแล้ว | Borrow | 409 `COPY_NOT_AVAILABLE` |
 | 7 | barcode ไม่มีในระบบ | Borrow | 404 `COPY_NOT_FOUND` |
-| 8 | loan ปกติ ตอนนี้ `T0+10d` | Renew | 200, `due_at = T0+21d` |
+| 8 | loan ปกติ ตอนนี้ `10-11 10:00` | Renew | 200, `due_at = 2026-10-22T23:59:59+07:00` |
 | 9 | loan ต่ออายุไปแล้ว 1 ครั้ง | Renew | 422 `RENEW_LIMIT_REACHED` |
-| 10 | ตอนนี้ `T0+14d+1s` | Renew | 422 `LOAN_OVERDUE` |
-| 11 | ตอนนี้ `T0+14d` | Return | 200, ไม่มี fine, copy กลับเป็น AVAILABLE |
-| 12 | ตอนนี้ `T0+16d+1h` | Return | 200, fine = 30 |
+| 10 | ตอนนี้ `10-16 00:00` | Renew | 422 `LOAN_OVERDUE` (ถ้าเป็น `10-15 23:59` ต้องต่อได้) |
+| 11 | ตอนนี้ `10-15 23:59` | Return | 200, ไม่มี fine, copy กลับเป็น AVAILABLE |
+| 12 | ตอนนี้ `10-18 09:00` | Return | 200, fine = 30 |
 | 13 | loan คืนไปแล้ว | Return | 409 `LOAN_ALREADY_RETURNED` |
 | 14 | fine ยังไม่จ่าย | Pay | 200 และ `paid_at` ถูกตั้งค่า จากนั้นสมาชิกยืมได้อีก |
 | 15 | fine จ่ายแล้ว | Pay | 409 `FINE_ALREADY_PAID` |
 | 16 | email ซ้ำ | POST /members | 409 `EMAIL_ALREADY_EXISTS` |
 | 17 | isbn = `"12345"` | POST /books | 400 `VALIDATION_ERROR` |
 | 18 | 20 goroutine พร้อมกัน | Borrow copy เดียวกัน | สำเร็จ 1 ครั้ง, `COPY_NOT_AVAILABLE` 19 ครั้ง |
-| 19 | ยืมค้าง 1 เล่ม, ตอนนี้ `T0+20d` | GET loans?status=overdue | ได้ loan นั้นกลับมา และ `status = OVERDUE` |
+| 19 | ยืมค้าง 1 เล่ม, ตอนนี้ `10-21 10:00` | GET loans?status=overdue | ได้ loan นั้นกลับมา และ `status = OVERDUE` |
 
 ---
 
