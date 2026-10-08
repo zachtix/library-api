@@ -8,8 +8,8 @@ import (
 )
 
 type CreateLoanRequest struct {
-	MemberID string `json:"member_id" validate:"required"`
-	Barcode  string `json:"barcode" validate:"required"`
+	MemberID uuid.UUID `json:"member_id" validate:"required"`
+	Barcode  string    `json:"barcode" validate:"required"`
 }
 
 type LoanResponse struct {
@@ -25,7 +25,39 @@ type LoanResponse struct {
 	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
+func LoanResponseFromDomain(l domain.Loan, now time.Time) LoanResponse {
+	return LoanResponse{
+		ID:         l.ID,
+		MemberID:   l.MemberID,
+		CopyID:     l.CopyID,
+		BorrowedAt: l.BorrowedAt,
+		DueAt:      l.DueAt,
+		ReturnedAt: l.ReturnedAt,
+		RenewCount: l.RenewCount,
+		Status:     l.Status(now),
+		CreatedAt:  l.CreatedAt,
+		UpdatedAt:  l.UpdatedAt,
+	}
+}
+
+func LoanResponsesFromDomain(loans []domain.Loan, now time.Time) []LoanResponse {
+	res := make([]LoanResponse, 0, len(loans))
+	for _, l := range loans {
+		res = append(res, LoanResponseFromDomain(l, now))
+	}
+	return res
+}
+
 type ReturnLoanResponse struct {
 	Loan LoanResponse  `json:"loan"`
 	Fine *FineResponse `json:"fine"`
+}
+
+func ReturnLoanResponseFromDomain(l domain.Loan, f *domain.Fine, now time.Time) ReturnLoanResponse {
+	res := ReturnLoanResponse{Loan: LoanResponseFromDomain(l, now)}
+	if f != nil {
+		fine := FineResponseFromDomain(*f)
+		res.Fine = &fine
+	}
+	return res
 }

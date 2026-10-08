@@ -37,6 +37,7 @@ func main() {
 	})
 
 	tx := gormadapter.NewGormTx(db)
+	clock := clockadapter.NewClock()
 
 	memberRepo := gormadapter.NewGormMemberRepository(db)
 	memberService := service.NewMemberService(memberRepo, uuidadapter.NewUUIDGenerator())
@@ -56,8 +57,8 @@ func main() {
 	booksRoute.Post("/:id/copies", bookHandler.AddCopie)
 
 	loanRepo := gormadapter.NewGormLoanRepository(db)
-	loanService := service.NewLoanService(loanRepo, uuidadapter.NewUUIDGenerator(), tx, clockadapter.NewClock())
-	loanHandler := fiberadapter.NewFiberLoanHandler(loanService)
+	loanService := service.NewLoanService(loanRepo, uuidadapter.NewUUIDGenerator(), tx, clock)
+	loanHandler := fiberadapter.NewFiberLoanHandler(loanService, clock)
 	loanRoute := app.Group("/loans")
 	loanRoute.Post("", loanHandler.Borrow)
 	loanRoute.Post("/:id/renew", loanHandler.Renew)
