@@ -2,8 +2,10 @@ package fiberadapter
 
 import (
 	"library/adapter/httpdto"
+	"library/core/domain"
 	"library/port/inport"
 	"library/port/outport"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -60,4 +62,32 @@ func (h *FiberLoanHandler) Return(c fiber.Ctx) error {
 	}
 
 	return newDataResponse(c, fiber.StatusOK, httpdto.ReturnLoanResponseFromDomain(ret, fine, h.clock.Now()), "return borrow successfully")
+}
+
+func (h *FiberLoanHandler) ListByMember(c fiber.Ctx) error {
+	memberID, err := parseUUIDParam(c, "id")
+	if err != nil {
+		return err
+	}
+
+	var status *domain.LoanStatus
+	if q := c.Query("status"); q != "" {
+		s := domain.LoanStatus(strings.ToUpper(q))
+		switch s {
+		case domain.LoanStatusActive, domain.LoanStatusOverdue, domain.LoanStatusReturned:
+			status = &s
+		default:
+			return &validationError{
+				message: "validation failed",
+				fields:  map[string]string{"status": "status must be one of active, overdue, returned"},
+			}
+		}
+	}
+
+	loans, err := h.service.ListByMember(memberID, status)
+	if err != nil {
+		return err
+	}
+
+	return newOKResponse(c, httpdto.LoanResponsesFromDomain(loans, h.clock.Now()), "list loans successfully")
 }

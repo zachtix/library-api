@@ -63,6 +63,7 @@ func main() {
 	loanRoute.Post("", loanHandler.Borrow)
 	loanRoute.Post("/:id/renew", loanHandler.Renew)
 	loanRoute.Post("/:id/return", loanHandler.Return)
+	membersRoute.Get("/:id/loans", loanHandler.ListByMember)
 
 	log.Fatal(app.Listen(":8080"))
 }
