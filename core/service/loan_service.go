@@ -88,8 +88,44 @@ func (s *loanServiceImpl) Borrow(memberID uuid.UUID, barcode string) (domain.Loa
 	return created, nil
 }
 
-func (s *loanServiceImpl) Renew(id uuid.UUID) (domain.Loan, error)
+func (s *loanServiceImpl) Renew(id uuid.UUID) (domain.Loan, error) {
+	loan, err := s.repo.FindByID(id)
+	if err != nil {
+		return domain.Loan{}, err
+	}
+	if loan.ReturnedAt != nil {
+		return domain.Loan{}, domain.ErrLoanAlreadyReturned
+	}
+	if loan.IsOverdue(s.clock.Now()) {
+		return domain.Loan{}, domain.ErrLoanOverdue
+	}
+	if loan.RenewCount > 0 {
+		return domain.Loan{}, domain.ErrRenewLimitReached
+	}
+
+	loan.DueAt = domain.RenewedDueAt(loan.DueAt)
+	loan.RenewCount = 1
+
+	return s.repo.Update(loan)
+}
 
 func (s *loanServiceImpl) Return(id uuid.UUID) (domain.Loan, *domain.Fine, error)
 
-func (s *loanServiceImpl) ListByMember(memberID uuid.UUID, status *domain.LoanStatus) ([]domain.Loan, error)
+func (s *loanServiceImpl) ListByMember(memberID uuid.UUID, status *domain.LoanStatus) ([]domain.Loan, error) {
+	loans, err := s.repo.ListByMember(memberID)
+	if err != nil {
+		return nil, err
+	}
+	if status == nil {
+		return loans, nil
+	}
+
+	now := s.clock.Now()
+	filtered := make([]domain.Loan, 0, len(loans))
+	for _, l := range loans {
+		if l.Status(now) == *status {
+			filtered = append(filtered, l)
+		}
+	}
+	return filtered, nil
+}
