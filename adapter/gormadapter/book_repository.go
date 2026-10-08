@@ -80,6 +80,24 @@ func (r *GormBookRepository) List(page domain.PageRequest, filter domain.BookFil
 	return books, total, nil
 }
 
-func (r *GormBookRepository) FindCopieByBarcode(barcode string) (domain.BookCopie, error)
+func (r *GormBookRepository) FindCopieByBarcode(barcode string) (domain.BookCopie, error) {
+	var model BookCopieModel
+	if err := r.db.Take(&model, "barcode = ?", barcode).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.BookCopie{}, domain.ErrCopyNotFound
+		}
+		return domain.BookCopie{}, err
+	}
+	return model.toDomain(), nil
+}
 
-func (r *GormBookRepository) UpdateCopieStatus(id uuid.UUID, status domain.BookStatus) error
+func (r *GormBookRepository) UpdateCopieStatus(id uuid.UUID, status domain.BookStatus) error {
+	model := r.db.Model(&BookCopieModel{}).Where("id = ?", id).Update("status", status)
+	if model.Error != nil {
+		return model.Error
+	}
+	if model.RowsAffected == 0 {
+		return domain.ErrCopyNotFound
+	}
+	return nil
+}
