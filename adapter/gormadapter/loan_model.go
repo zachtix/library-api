@@ -52,3 +52,11 @@ func loanFromDomain(l domain.Loan) LoanModel {
 		DeletedAt:  deletedAtFromDomain(l.DeletedAt),
 	}
 }
+
+func loansToDomain(models []LoanModel) []domain.Loan {
+	loans := make([]domain.Loan, 0, len(models))
+	for _, m := range models {
+		loans = append(loans, m.toDomain())
+	}
+	return loans
+}
